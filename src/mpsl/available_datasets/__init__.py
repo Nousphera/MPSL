@@ -78,7 +78,7 @@ class DirichletDataPartitioner:
 			if self._num_partitions > len(self.dataset):
 				raise ValueError("The number of partitions needs to be smaller than the number of samples in the dataset.")
 				
-	def _initialize_alpha(self, alpha: typing.Union[int, float, typing.List[float], npt.NDArray[np.float_]]) -> npt.NDArray[np.float_]:
+	def _initialize_alpha(self, alpha: typing.Union[int, float, typing.List[float], npt.NDArray[np.float64]]) -> npt.NDArray[np.float64]:
 		if isinstance(alpha, int):
 			alpha = np.array([float(alpha)], dtype=float).repeat(self._num_partitions)
 		elif isinstance(alpha, float):

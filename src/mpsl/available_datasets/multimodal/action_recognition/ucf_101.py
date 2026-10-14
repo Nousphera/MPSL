@@ -86,7 +86,8 @@ class UCF101:
         if self.img_transform:
             frame = self.img_transform(frame)
 
-        audio, sr = torchaudio.load(video_path, format=VIDEO_FILETYPE)
+        from mpsl.available_datasets.utils.media import read_audio
+        audio, sr = read_audio(video_path)
 
         if audio.shape[0] == 2:
             audio = audio.mean(dim=0, keepdim=True)
@@ -124,8 +125,7 @@ class UCF101:
     def _download(output_dir):
         def download_file(url, dest):
             if not os.path.exists(dest):
-                context = urllib.request.ssl._create_unverified_context()
-                with urllib.request.urlopen(url, context=context) as response, open(dest, 'wb') as out_file:
+                with urllib.request.urlopen(url) as response, open(dest, 'wb') as out_file:
                     shutil.copyfileobj(response, out_file)
 
         # Step 0: Create dataset folder

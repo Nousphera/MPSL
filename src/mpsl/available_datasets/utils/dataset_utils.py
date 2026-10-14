@@ -8,6 +8,7 @@ import torchaudio
 import torchvision
 import transformers
 from torchvision.datasets.utils import download_and_extract_archive
+from mpsl.available_datasets.utils.media import read_video_audio
 
 
 def download_and_extract_data(data_pairs_to_download):
@@ -212,7 +213,7 @@ class VideoAudioDataset(torch.utils.data.Dataset):
 
     def __getitem__(self, idx):
         fp, label = self.video_files[idx], self.targets[idx]
-        video, audio, info = torchvision.io.read_video(fp, output_format='TCHW', pts_unit='sec')
+        video, audio, info = read_video_audio(fp)
         if 'audio_fps' not in info.keys():
             print(fp, info, video, audio)
         assert info[

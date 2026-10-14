@@ -3,12 +3,17 @@ on: [push, pull_request]
 jobs:
   smoke:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        extras: [test, "test,experiments"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           cache: pip
-      - run: python -m pip install -e '.[test]'
+      - run: python -m pip install --index-url https://download.pytorch.org/whl/cpu torch==2.14.1 torchvision==0.29.1
+      - run: python -m pip install -e '.[${{ matrix.extras }}]'
+      - run: python -m pip check
       - run: python -m pytest
       - run: python -m mpsl.smoke

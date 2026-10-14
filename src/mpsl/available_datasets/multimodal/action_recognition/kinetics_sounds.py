@@ -142,7 +142,8 @@ class KineticsSounds:
             if self.img_transform:
                 frame = self.img_transform(frame)
 
-            audio, sr = torchaudio.load(video_path, format="mp4")
+            from mpsl.available_datasets.utils.media import read_audio
+            audio, sr = read_audio(video_path)
 
             if audio.shape[0] == 2:
                 audio = audio.mean(dim=0, keepdim=True)

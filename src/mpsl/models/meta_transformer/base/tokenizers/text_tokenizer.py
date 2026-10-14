@@ -1,53 +1,48 @@
+"""OpenAI CLIP text inputs using the maintained OpenCLIP package."""
+
 import torch
 from torch import nn
-# Note: requires dependency `openai-clip`, not `clip`.
-import clip
 
-cpu_device = torch.device('cpu')
-
-clip_model, clip_image_pre_process = None, None
+# Frozen external features do not belong to the federated model state.
+_ENCODERS = {}
 
 
 class TextTokenizer(nn.Module):
-
     def __init__(self, embed_dim, **kwargs):
         super().__init__()
-
         self.embed_dim = embed_dim
-        self.desired_target_device = kwargs['device']
-        self.use_clip_encoder_for_text_embeddings = kwargs['use_clip_encoder_for_text_embeddings']
-        self.use_large_encoder = kwargs['use_large_encoder']
-        self.kwargs = kwargs
+        self.desired_target_device = torch.device(kwargs["device"])
+        self.use_clip_encoder_for_text_embeddings = kwargs[
+            "use_clip_encoder_for_text_embeddings"
+        ]
 
-    def forward(self, x):
-        return self.get_text_embeddings(x)
+    def forward(self, text):
+        return self.get_text_embeddings(text)
 
     def get_text_embeddings(self, text):
-        global clip_model, clip_image_pre_process
+        import open_clip
 
-        if clip_model is None:
-            # We'll import the module here to avoid circular dependencies.
-            from mpsl.models.meta_transformer.base.meta_transformer import vit_base_encoder_options
-
-            # We should use ViT-L/14 here for both the ViT-L/14 and ViT-H/14 base encoders.
-            # Hence, we should only use ViT-B/16 if the required dimension is equal to or lower than 768 (as ViT-B/16 is the lowest encoder we can use here).
-            base_encoder = 'ViT-B/16' if self.embed_dim <= vit_base_encoder_options['ViT-B/16']['embed_dim'] else 'ViT-L/14'
-            clip_model, clip_image_pre_process = clip.load(base_encoder, cpu_device)
-            clip_model = clip_model.to(self.desired_target_device)
-
-        text_tensor = clip.tokenize(text, truncate=True)
-        text_tensor = text_tensor.to(self.desired_target_device)
-
+        # Same BPE vocabulary, context 77 and truncation as OpenAI CLIP.
+        tokens = open_clip.tokenize(text).to(self.desired_target_device)
         if self.use_clip_encoder_for_text_embeddings:
-            text_tensor = clip_model.encode_text(text_tensor)
-            text_tensor = text_tensor.to(self.desired_target_device)
+            name = "ViT-B-16" if self.embed_dim <= 768 else "ViT-L-14"
+            key = (name, str(self.desired_target_device))
+            if key not in _ENCODERS:
+                encoder, _, _ = open_clip.create_model_and_transforms(
+                    name,
+                    pretrained="openai",
+                    device=self.desired_target_device,
+                    force_quick_gelu=True,
+                )
+                _ENCODERS[key] = encoder.eval().requires_grad_(False)
+            with torch.no_grad():
+                tokens = _ENCODERS[key].encode_text(tokens, normalize=False)
+        return self.zero_padding(tokens, self.embed_dim)
 
-        # The original text_tensor is of shape [batch_size, 77] or [batch_size, 512] if merely tokenized or also encoded, respectively. We'll need to zero pad it to the required embed_dim.
-        return self.zero_padding(text_tensor, self.embed_dim)
-
-    def zero_padding(self, text_tensor, tar_dim):
-        padding_size = tar_dim - text_tensor.shape[1]
-        zero_tensor = torch.zeros((text_tensor.shape[0], padding_size), device=self.desired_target_device)
-        padded_tensor = torch.cat([text_tensor, zero_tensor], dim=1)
-
-        return padded_tensor
+    def zero_padding(self, values, target_dim):
+        if target_dim < values.shape[1]:
+            raise ValueError(
+                "The target dimension is smaller than the text representation"
+            )
+        values = values.float()
+        return torch.nn.functional.pad(values, (0, target_dim - values.shape[1]))

@@ -40,12 +40,12 @@ This protocol does **not** establish label privacy. In ordinary single-label cro
 
 ## Environments and records
 
-The maintained stack uses Python 3.11/3.12, PyTorch 2.5.1 and torchvision 0.20.1. Full experiment extras pin compatible tokenizer/model/data dependencies; `setuptools` is pinned because OpenAI CLIP 1.0.1 still imports `pkg_resources`. The original pins are archival, not the recommended install.
+The maintained stack uses Python 3.11/3.12, PyTorch 2.14.1, torchvision 0.29.1, Transformers 5.19 and OpenCLIP 3.3. The original experiment pins are archival, not the recommended install. OpenCLIP loads the same named OpenAI CLIP checkpoints; the tokenizer reproduces the original BPE IDs, context length and truncation. Frozen external text encoders are cached by architecture and device, outside the federated model state. Token-only runs do not download an unused encoder. PyAV decodes media because current torchvision no longer provides `read_video`; audio filterbanks retain torchaudio Kaldi processing. HTTPS certificate verification is preserved. NumPy 2 is used for compatibility with current PyArrow. The [resolved macOS CPU environment](../requirements-tested-macos-py311.txt) records the executed stack; other platforms must resolve compatible platform wheels, especially for audio.
 
 Save the complete command, dataset version/split, checkpoint hash, seed and dependency freeze with every experiment. The CPU smoke writes exact indices and metrics. Research loaders may need access to large datasets or provider credentials; those resources are not redistributed here.
 
 ## Validated versus unverified
 
-Validated locally: package installation, regression tests, offline early/late fusion training and deterministic repeat, classification/retrieval update equivalence with detached and serialized exchanges, exact tensor payload accounting, checkpoint round trips, and dataset partition coverage. Full benchmark accuracy, multi-seed confidence intervals, H100 runtime, real network communication and formal privacy are not re-established by these checks.
+Validated locally: all 77 package modules import with experiment dependencies; generated video/audio decode and Kaldi filterbanks execute; original CLIP token IDs and truncation match; package installation, regression tests, offline early/late fusion training and deterministic repeat, classification/retrieval update equivalence with detached and serialized exchanges, exact tensor payload accounting, checkpoint round trips, and dataset partition coverage. Full benchmark accuracy, multi-seed confidence intervals, H100 runtime, real network communication and formal privacy are not re-established by these checks.
 
 The historical centralized/federated/retrieval experiment variants are retained. Their full dataset trajectories have not been rerun. Do not combine older paper numbers with new implementation timings as if they were measured together.

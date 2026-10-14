@@ -1,6 +1,4 @@
 import os
-# Disable SSL verification for the downloading of the datasets
-import ssl
 
 import torch
 import torchvision
@@ -8,8 +6,6 @@ from PIL import Image
 from transformers import AutoImageProcessor
 
 from mpsl.models import InputModality
-
-ssl._create_default_https_context = ssl._create_unverified_context
 
 
 class CIFAR100(torchvision.datasets.CIFAR100):
