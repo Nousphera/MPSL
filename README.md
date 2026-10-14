@@ -1,170 +1,65 @@
-# Fine-tuning Multimodal Transformers on Edge: A Parallel Split Learning Approach
+# MPSL
 
-Multimodal transformers integrate diverse data types like images, audio, and text, advancing tasks such as audio-visual understanding and image-text retrieval; yet their high parameterization limits deployment on resource-constrained edge devices. Split Learning (SL), which partitions models at a designated cut-layer to offload compute-intensive operations to the server, offers a promising approach for distributed training of multimodal transformers, though its application remains underexplored. We present MPSL, a parallel SL approach for computational efficient fine-tuning of multimodal transformers in a distributed manner, while eliminating label sharing, client synchronization, and per-client sub-model management. MPSL employs lightweight client-side tokenizers and a unified modality-agnostic encoder, allowing flexible adaptation to task-specific needs. Our evaluation across 7 multimodal datasets demonstrates that MPSL matches or outperforms Federated Learning, reduces client-side computations by 250x, and achieves superior scalability in communication cost with model growth. Through extensive analysis, we highlight task suitability, trade-offs, and scenarios where MPSL excels, inspiring further exploration.
+**Fine-tuning Multimodal Transformers on Edge: A Parallel Split Learning Approach**
 
-[[paper](https://arxiv.org/pdf/2502.06355)]
+[Paper](https://arxiv.org/abs/2502.06355) · [Project](https://nousphera.github.io/MPSL/) · [Experiment guide](docs/experiments.md) · [Reproducibility](docs/REPRODUCIBILITY.md)
 
-## Environment
-We conduct our experiments with Python 3.11.3 using a single NVIDIA H100 GPU.
+Lightweight client tokenizers and a shared server encoder support **image–text, audio–text and audio–video learning**. Clients compute their losses; the server combines their gradients. The repository includes MPSL, centralized and federated baselines, and early/late fusion implementations.
 
-Create a new Python environment (using e.g. virtualenv or anaconda) and install all required packages via:
-```console
-foo@bar:~$ pip install -r requirements.txt
+This is a maintained revision of the authors' research code. The implementation is a **single-process research simulator**: tensors and autograd connections model client/server exchanges. It does not implement a private distributed transport or establish a privacy guarantee.
+
+## Start with a CPU check
+
+Python 3.11–3.12. No datasets, checkpoints or GPU are needed for this check.
+
+```bash
+python3.11 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e '.[test]'
+python -m pytest
+python -m mpsl.smoke --output runs/smoke
 ```
 
-## Model
-Throughout our experiments, we use pre-trained weights from [Meta-Transformer](https://github.com/invictus717/MetaTransformer) based on ViT-B/16 (Meta-Transformer's base scale). In order to execute our experiments, ensure the model weights have been downloaded.
+The smoke run trains **two clients, two synthetic modalities and both fusion paths**, using the real classification split trainer. It records losses, accuracy, tensor payload bytes and partition indices in `runs/smoke/metrics.json`. These are execution checks, not paper results. Use a new output directory to preserve earlier runs.
 
-## Datasets
-The following datasets are used in our experiments:
+## Run research experiments
 
-- [COCO-QA](https://www.cs.toronto.edu/~mren/research/imageqa/data/cocoqa/)
-- [Flickr30K](https://huggingface.co/datasets/nlphuji/flickr30k)
-- [Kinetics-Sounds](https://github.com/weiguoPian/AV-CIL_ICCV2023)
-- [MELD](https://affective-meld.github.io/)
-- [MS-COCO](https://cocodataset.org/)
-- [T4SA](http://www.t4sa.it/)
-- [UCF101](https://www.crcv.ucf.edu/data/UCF101.php)
-
-All datasets, except for T4SA and Kinetics-Sounds, are downloaded automatically when the experiments are initialized. For instructions on how to include these two datasets, please refer to the sections on [T4SA](#t4sa) and [Kinetics-Sounds](#kinetics-sounds) below.
-
-### T4SA
-Access to the T4SA dataset requires authentication. Please visit [the official website](http://www.t4sa.it/) to request access and download the dataset. We use the **B-T4SA** version in our experiments.
-
-Once downloaded, place the dataset in a sub-folder named `b-t4sa`, in the datasets parent folder.
-
-### Kinetics-Sounds
-For including the Kinetics-Sounds dataset, we follow the instructions in [this](https://github.com/weiguoPian/AV-CIL_ICCV2023) repository. Since Kinetics-Sounds is a subset of Kinetics-400, the original data has to be downloaded using the [official](https://github.com/cvdfoundation/kinetics-dataset) repository.
-To ensure the data is in the expected format for our codebase, please refer to the steps below.
-
-1. Download and extract the Kinetics-400 dataset into your `datasets` folder following the instructions in the [official](https://github.com/cvdfoundation/kinetics-dataset) repository.
-2. Execute `python arrange_by_classes.py k400` to restructure the raw Kinetics-400 data. The python file is included in the official repository.
-3. Optional: If you wish to minimize used space, delete the `k400_targz` folder by executing `rm -r k400_targz`.
-4. Optional: The Kinetics-Sounds data that we use for our experiments is roughly 24 GB worth of videos, whereas Kinetics-400 in its entirety is roughly 441 GB. Upon initialization, the codebase will copy the relevant video files into a `kinetics-sounds` folder in your `dataset` folder. Once finished, the `kinetics-dataset` folder that contains all Kinetics-400 data can be deleted. 
-
-## Executing experiments
-To run any of the experiments, execute one of the following scripts located in the `src` folder:
-
-- `main_mpsl.py`: Runs fine-tuning using MPSL — **our proposed framework**.
-- `main_centralized.py`: Runs centralized fine-tuning.
-- `main_fl.py`: Runs fine-tuning using Federated Learning. 
-  - To reproduce the adapter-based approach from [FedCLIP](https://github.com/microsoft/PersonalizedFL), use `main_fl.py` with the `--use_adapter_approach` flag set to `True`.
-
-Each script supports a set of configurable parameters passed as command-line arguments. To view all available options for a specific script, use the `--help` flag. For example:
-```console
-foo@bar:~$ python -u main_mpsl.py --help
+```bash
+python -m pip install -e '.[experiments,test]'
+python -m mpsl.main_mpsl --help
+python -m mpsl.main_centralized --help
+python -m mpsl.main_fl --help
 ```
 
-### Example usage
-Please refer to the examples below on how to execute experiments with the COCO-QA dataset.
+Acquire the pretrained **Meta-Transformer** weights and datasets described in the [experiment guide](docs/experiments.md). Full multimodal training is substantially more expensive than the smoke check; the original experiments used an NVIDIA H100.
 
-**Fine-tuning the model on the COCO-QA dataset using our proposed framework (MPSL):**
-```console
-foo@bar:~$ python -u main_mpsl.py --model meta_transformer \
-                                  --dataset coco-qa \
-                                  --dataset_split_type noniid \
-                                  --nr_of_clients 100 \
-                                  --batch_size 500 \
-                                  --nr_of_epochs 15 \
-                                  --nr_of_last_encoder_blocks_to_finetune 6 \
-                                  --start_lr 1e-4 \
-                                  --random_seed 2024 \
-                                  --save_file_name my_trained_model \
-                                  --torch_data_dir <path_to_datasets_folder> \
-                                  --pre_processors_cache_dir <path_to_preprocessors_cache_folder> \
-                                  --tokenizer_weights_cache_dir <path_to_tokenizer_weights_folder> \
-                                  --model_weights_dir <path_to_model_weights_folder>
+```bash
+python -m mpsl.main_mpsl \
+  --dataset coco-qa --dataset_split_type noniid --dirichlet_alpha 0.1 \
+  --nr_of_clients 25 --batch_size 125 --nr_of_epochs 15 \
+  --nr_of_last_encoder_blocks_to_finetune 6 --start_lr 1e-4 \
+  --random_seed 2024 --save_file_name cocoqa-mpsl \
+  --torch_data_dir data --pre_processors_cache_dir cache/preprocessors \
+  --tokenizer_weights_cache_dir cache/tokenizers --model_weights_dir checkpoints
 ```
 
-**Centralized fine-tuning:**
-```console                            
-# Centralized
-foo@bar:~$ python -u main_centralized.py --model meta_transformer \
-                                         --dataset coco-qa \
-                                         --batch_size 500 \
-                                         --nr_of_epochs 15 \
-                                         --nr_of_last_encoder_blocks_to_finetune 6 \
-                                         --start_lr 1e-4 \
-                                         --random_seed 2024 \
-                                         --save_file_name my_trained_model \
-                                         --torch_data_dir <path_to_datasets_folder> \
-                                         --pre_processors_cache_dir <path_to_preprocessors_cache_folder> \
-                                         --tokenizer_weights_cache_dir <path_to_tokenizer_weights_folder> \
-                                         --model_weights_dir <path_to_model_weights_folder>
-```
+Create these data/cache/checkpoint directories first. Supply a unique save name. Set the server batch size to a multiple of the client count. `--dirichlet_alpha 0.1` follows the paper; `0.5` recovers the historical code's concentration. Dataset acquisition and access restrictions are documented per dataset.
 
-**Federated Learning:**
-```console
-foo@bar:~$ python -u main_fl.py --model meta_transformer \
-                                --dataset coco-qa \
-                                --dataset_split_type noniid \
-                                --nr_of_clients 100 \
-                                --batch_size 500 \
-                                --nr_of_epochs 15 \
-                                --nr_of_last_encoder_blocks_to_finetune 6 \
-                                --start_lr 1e-4 \
-                                --random_seed 2024 \
-                                --save_file_name my_trained_model \
-                                --torch_data_dir <path_to_datasets_folder> \
-                                --pre_processors_cache_dir <path_to_preprocessors_cache_folder> \
-                                --tokenizer_weights_cache_dir <path_to_tokenizer_weights_folder> \
-                                --model_weights_dir <path_to_model_weights_folder>
-```
+## What is included
 
-**Federated Learning + Adapter (FedCLIP) approach:**
-```console
-foo@bar:~$ python -u main_fl.py --use_adapter_approach True \
-                                --include_image_adapter True \
-                                --include_text_adapter True \
-                                --model meta_transformer \
-                                --dataset coco-qa \
-                                --dataset_split_type noniid \
-                                --nr_of_clients 100 \
-                                --batch_size 500 \
-                                --nr_of_epochs 15 \
-                                --nr_of_last_encoder_blocks_to_finetune 6 \
-                                --start_lr 1e-4 \
-                                --random_seed 2024 \
-                                --save_file_name my_trained_model \
-                                --torch_data_dir <path_to_datasets_folder> \
-                                --pre_processors_cache_dir <path_to_preprocessors_cache_folder> \
-                                --tokenizer_weights_cache_dir <path_to_tokenizer_weights_folder> \
-                                --model_weights_dir <path_to_model_weights_folder>
-```
+| Component | Location |
+| --- | --- |
+| Shared transformer and modality tokenizers | `src/mpsl/models/` |
+| Split, centralized and federated trainers | `src/mpsl/trainers/` |
+| Dataset loaders and seeded client partitions | `src/mpsl/available_datasets/` |
+| Tensor communication accounting and aggregation | `src/mpsl/utils/` |
+| Offline early/late fusion execution check | `src/mpsl/smoke.py` |
+| Regression and gradient-equivalence checks | `tests/` |
 
-### Calculating computation overhead
-To calculate the computation overhead, refer to `src/calculate_computation_overhead.py`. The computation overhead is initially calculated for the centralized models. From this, we deduce the overhead for the Split Learning counterpart by reasoning about which layers are executed on the client-side and server-side.
+The maintained release fixes partial-batch accuracy weighting in split and baseline trainers, shared experiment-history state, storage-based communication counts and non-contiguous participating-client IDs. Dataset/model imports are lazy, and the code installs under the `mpsl` namespace rather than generic top-level `models` or `utils` packages.
 
-Below is an example of how to calculate the computation overhead for the model used with the COCO-QA dataset:
+## Validation boundaries
 
-```console
-foo@bar:~$ python -u calculate_computation_overhead.py --dataset coco-qa \
-                                                       --model meta_transformer \
-                                                       --use_pre_layer_norm True \
-                                                       --use_post_layer_norm False \
-                                                       --nr_of_last_encoder_blocks_to_finetune 6 \
-                                                       --torch_data_dir <path_to_datasets_folder> \
-                                                       --pre_processors_cache_dir <path_to_preprocessors_cache_folder> \
-                                                       --tokenizer_weights_cache_dir <path_to_tokenizer_weights_folder> \
-                                                       --model_weights_dir <path_to_model_weights_folder>
-```
+Tests check split-gradient equivalence to a joint weighted batch, deterministic early/late fusion training, isolated metrics, dtype-aware payload sizes and partition coverage. Full published dataset results, accelerator performance and all retrieval benchmarks have **not** been rerun for this revision. Tensor byte counts exclude network framing and do not measure encrypted or authenticated traffic.
 
-## Citations
-If you use this repository or find our work helpful, please consider citing:
-
-<pre>@misc{fudala2025finetuningmultimodaltransformersedge,
-      title={Fine-tuning Multimodal Transformers on Edge: A Parallel Split Learning Approach}, 
-      author={Timo Fudala and Vasileios Tsouvalas and Nirvana Meratnia},
-      year={2025},
-      eprint={2502.06355},
-      archivePrefix={arXiv},
-      primaryClass={cs.DC},
-      url={https://arxiv.org/abs/2502.06355}, 
-}
-</pre>
-<!-- nousphera-project-resources -->
-## Project resources
-
-[Project page](https://nousphera.github.io/MPSL/) · [Research overview](https://nousphera.github.io/projects/mpsl/) · [A0 poster](https://nousphera.github.io/MPSL/poster.pdf) · [Paper](https://arxiv.org/abs/2502.06355)
-
-This repository contains the research implementation. The project page and poster summarize the published method and reported experiments; this documentation update does not claim an independent reproduction of those experiments.
+See [reproducibility notes](docs/REPRODUCIBILITY.md) for source provenance and the precise scope of validation. Dataset, model and third-party code terms continue to apply; the repository retains its MIT license.
