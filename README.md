@@ -24,6 +24,18 @@ The smoke run trains **two clients, two synthetic modalities and both fusion pat
 
 ## Run research experiments
 
+On **Linux CPU**, install the CPU wheels first. The default Linux torchaudio
+wheel expects CUDA, even when PyTorch was installed from the CPU index:
+
+```bash
+python -m pip install --index-url https://download.pytorch.org/whl/cpu \
+  torch==2.14.1 torchvision==0.29.1 torchaudio==2.11.0
+```
+
+macOS uses the standard platform wheels. GPU users should select compatible
+PyTorch and audio wheels for their CUDA runtime; accelerator execution has not
+been revalidated for this revision.
+
 ```bash
 python -m pip install -e '.[experiments,test]'
 python -m mpsl.main_mpsl --help
