@@ -162,3 +162,9 @@ If you use this repository or find our work helpful, please consider citing:
       url={https://arxiv.org/abs/2502.06355}, 
 }
 </pre>
+<!-- nousphera-project-resources -->
+## Project resources
+
+[Project page](https://nousphera.github.io/MPSL/) · [Research overview](https://nousphera.github.io/projects/mpsl/) · [A0 poster](https://nousphera.github.io/MPSL/poster.pdf) · [Paper](https://arxiv.org/abs/2502.06355)
+
+This repository contains the research implementation. The project page and poster summarize the published method and reported experiments; this documentation update does not claim an independent reproduction of those experiments.

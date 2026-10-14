@@ -1,0 +1,9 @@
+cff-version: 1.2.0
+message: "Please cite the associated research paper."
+title: "Fine-Tuning Multimodal Transformers on Edge: A Parallel Split Learning Approach"
+type: article
+authors:
+  - name: "Timo Fudala"
+  - name: "Vasileios Tsouvalas"
+  - name: "Nirvana Meratnia"
+url: https://arxiv.org/abs/2502.06355
