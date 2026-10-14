@@ -24,7 +24,7 @@ def _load_checkpoint(file_name, device):
         raise Exception('file_name should not be None or an empty string.')
 
     file_name = f'{file_name}.pth'
-    checkpoint = torch.load(os.path.join(os.environ['MODEL_WEIGHTS_DIR'], file_name), map_location=device)
+    checkpoint = torch.load(os.path.join(os.environ['MODEL_WEIGHTS_DIR'], file_name), map_location=device, weights_only=True)
 
     return checkpoint
 
@@ -85,9 +85,8 @@ def load_federated_model(aggregated_model, client_models: dict, device, checkpoi
 
     aggregated_model.load_state_dict(checkpoint[AGGREGATED_MODEL_NAME])
 
-    for idx in range(len(client_models)):
-        if idx in client_models:
-            client_models[idx].load_state_dict(checkpoint[get_client_name(idx)])
+    for client_id, model in client_models.items():
+        model.load_state_dict(checkpoint[get_client_name(client_id)])
 
     return aggregated_model, client_models
 

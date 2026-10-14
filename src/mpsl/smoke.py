@@ -3,6 +3,7 @@
 Two synthetic modalities and small trainable networks exercise both fusion paths.
 This is not a Meta-Transformer benchmark or a network privacy demonstration.
 """
+
 import argparse
 import copy
 import json
@@ -53,34 +54,69 @@ def run(fusion="early", epochs=3, seed=7):
     y = (x[:, 0] + x[:, 4] > 0).long()
     # Uneven client and batch sizes deliberately exercise weighting and exhaustion.
     indices = [list(range(0, 21)), list(range(21, 45))]
-    loaders = {i: DataLoader(TensorDataset(x[part], y[part]), batch_size=8)
-               for i, part in enumerate(indices)}
+    loaders = {
+        i: DataLoader(TensorDataset(x[part], y[part]), batch_size=8)
+        for i, part in enumerate(indices)
+    }
     clients = {i: Client(fusion) for i in range(2)}
     server = Server()
     before = copy.deepcopy(server.state_dict())
-    optimizers = {i: torch.optim.SGD(model.parameters(), lr=.1) for i, model in clients.items()}
-    server_optimizer = torch.optim.SGD(server.parameters(), lr=.1)
+    optimizers = {
+        i: torch.optim.SGD(model.parameters(), lr=0.1) for i, model in clients.items()
+    }
+    server_optimizer = torch.optim.SGD(server.parameters(), lr=0.1)
     trainer = MPSLTrainer(fusion, [InputModality.IMAGE, InputModality.AUDIO])
     results = ExperimentResults()
     history = []
     for epoch in range(1, epochs + 1):
         for model in [*clients.values(), server]:
             model.train()
-        method = trainer._early_fusion_epoch if fusion == "early" else trainer._late_fusion_epoch
-        out = method(torch.device("cpu"), server, server_optimizer,
-                     {i: iter(loader) for i, loader in loaders.items()}, clients, True,
-                     optimizers, max(map(len, loaders.values())), SimpleNamespace(nr_of_clients=2))
+        method = (
+            trainer._early_fusion_epoch
+            if fusion == "early"
+            else trainer._late_fusion_epoch
+        )
+        out = method(
+            torch.device("cpu"),
+            server,
+            server_optimizer,
+            {i: iter(loader) for i, loader in loaders.items()},
+            clients,
+            True,
+            optimizers,
+            max(map(len, loaders.values())),
+            SimpleNamespace(nr_of_clients=2),
+        )
         total = sum(out[-1].values())
-        history.append({"epoch": epoch, "loss": out[0] / total, "accuracy": out[1] / total,
-                        "server_incoming_bytes": out[2], "server_outgoing_bytes": out[3]})
+        history.append(
+            {
+                "epoch": epoch,
+                "loss": out[0] / total,
+                "accuracy": out[1] / total,
+                "server_incoming_bytes": out[2],
+                "server_outgoing_bytes": out[3],
+            }
+        )
         averaged = fed_avg(clients, {0: 21 / 45, 1: 24 / 45})
-        trainer._test_epoch(averaged, server,
-                            DataLoader(TensorDataset(x[45:], y[45:]), batch_size=8),
-                            torch.device("cpu"), results, epoch)
-    return {"scope": "synthetic execution check", "fusion": fusion, "seed": seed,
-            "history": history, "test_accuracy": results.test_metric,
-            "server_updated": any(not torch.equal(before[k], v) for k, v in server.state_dict().items()),
-            "partitions": indices}
+        trainer._test_epoch(
+            averaged,
+            server,
+            DataLoader(TensorDataset(x[45:], y[45:]), batch_size=8),
+            torch.device("cpu"),
+            results,
+            epoch,
+        )
+    return {
+        "scope": "synthetic execution check",
+        "fusion": fusion,
+        "seed": seed,
+        "history": history,
+        "test_accuracy": results.test_metric,
+        "server_updated": any(
+            not torch.equal(before[k], v) for k, v in server.state_dict().items()
+        ),
+        "partitions": indices,
+    }
 
 
 def main():

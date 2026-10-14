@@ -322,7 +322,7 @@ if __name__ == '__main__':
     print(as_table)
     print(as_str)
 
-    print('============ PRINTED FLOPS ARE ACTUALLY MACs. To obtain FLOPS, divide by 2 ============')
+    print('fvcore counts one fused multiply-add as one operation. For MAC-based layers, multiply by 2 to report two arithmetic operations per MAC; other operators and unsupported operations need separate accounting.')
     print('============ flops scale with the batch_sizes so if you want the flops for e.g. a batch_size of 500, just multiply by 500 ============')
 
     print(f'Number of trainable parameters: {sum(p.numel() for p in model.parameters() if p.requires_grad)} | Number of total parameters: {sum(p.numel() for p in model.parameters())}')

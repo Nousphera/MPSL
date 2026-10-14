@@ -129,12 +129,13 @@ python -u -m mpsl.main_fl --use_adapter_approach True \
 ```
 
 ### Calculating computation overhead
-To calculate the computation overhead, refer to `src/calculate_computation_overhead.py`. The computation overhead is initially calculated for the centralized models. From this, we deduce the overhead for the Split Learning counterpart by reasoning about which layers are executed on the client-side and server-side.
+To calculate the computation overhead, refer to `src/mpsl/calculate_computation_overhead.py`. The computation overhead is initially calculated for the centralized models. From this, we deduce the overhead for the Split Learning counterpart by reasoning about which layers are executed on the client-side and server-side.
 
 Below is an example of how to calculate the computation overhead for the model used with the COCO-QA dataset:
 
 ```console
-python -u calculate_computation_overhead --dataset coco-qa \
+python -u -m mpsl.calculate_computation_overhead --dataset coco-qa \
+                                                       --save_file_name cocoqa-overhead \
                                                        --model meta_transformer \
                                                        --use_pre_layer_norm True \
                                                        --use_post_layer_norm False \

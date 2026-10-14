@@ -4,9 +4,9 @@
 
 [Paper](https://arxiv.org/abs/2502.06355) · [Project](https://nousphera.github.io/MPSL/) · [Experiment guide](docs/experiments.md) · [Reproducibility](docs/REPRODUCIBILITY.md)
 
-Lightweight client tokenizers and a shared server encoder support **image–text, audio–text and audio–video learning**. Clients compute their losses; the server combines their gradients. The repository includes MPSL, centralized and federated baselines, and early/late fusion implementations.
+Lightweight client tokenizers and a shared server encoder support **image–text, audio–text and audio–video learning**. Clients compute their losses on detached predictions and return sample-weighted prediction gradients; the server performs one backward pass. The repository includes MPSL, centralized and federated baselines, and early/late fusion implementations.
 
-This is a maintained revision of the authors' research code. The implementation is a **single-process research simulator**: tensors and autograd connections model client/server exchanges. It does not implement a private distributed transport or establish a privacy guarantee.
+This is a maintained revision of the authors' research code. The implementation is a **single-process research simulator** with explicit detached tensor exchanges. It does not implement a private distributed transport or establish a privacy guarantee. Unlike the original scalar-loss simulation, it counts the prediction gradients needed for server backpropagation. Those gradients can reveal labels; see the [method and communication correction](docs/REPRODUCIBILITY.md#explicit-gradient-exchange).
 
 ## Start with a CPU check
 
@@ -56,10 +56,10 @@ Create these data/cache/checkpoint directories first. Supply a unique save name.
 | Offline early/late fusion execution check | `src/mpsl/smoke.py` |
 | Regression and gradient-equivalence checks | `tests/` |
 
-The maintained release fixes partial-batch accuracy weighting in split and baseline trainers, shared experiment-history state, storage-based communication counts and non-contiguous participating-client IDs. Dataset/model imports are lazy, and the code installs under the `mpsl` namespace rather than generic top-level `models` or `utils` packages.
+The maintained release fixes partial-batch accuracy weighting in split and baseline trainers, shared experiment-history state, storage-based communication counts, non-contiguous client aggregation/checkpoint loading, and retrieval partitions that could omit samples. Dataset/model imports are lazy, and the code installs under the `mpsl` namespace rather than generic top-level `models` or `utils` packages.
 
 ## Validation boundaries
 
-Tests check split-gradient equivalence to a joint weighted batch, deterministic early/late fusion training, isolated metrics, dtype-aware payload sizes and partition coverage. Full published dataset results, accelerator performance and all retrieval benchmarks have **not** been rerun for this revision. Tensor byte counts exclude network framing and do not measure encrypted or authenticated traffic.
+Tests check classification and retrieval update equivalence across serialized tensor boundaries, deterministic early/late fusion training, isolated metrics, dtype-aware payload sizes, partition coverage and checkpoint round trips. Full published dataset results, accelerator performance and retrieval benchmarks have **not** been rerun for this revision. Tensor byte counts exclude serialization headers, shape/dtype metadata and network framing, and do not measure encrypted or authenticated traffic.
 
 See [reproducibility notes](docs/REPRODUCIBILITY.md) for source provenance and the precise scope of validation. Dataset, model and third-party code terms continue to apply; the repository retains its MIT license.

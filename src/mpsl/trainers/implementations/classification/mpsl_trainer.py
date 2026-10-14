@@ -6,16 +6,19 @@ from mpsl.trainers.implementations.experiment_results import ExperimentResults
 from mpsl.trainers.implementations.experiment_trainer import ExperimentTrainer
 from mpsl.utils.mpsl_utils import get_communication_size, compute_aggregated_loss, bytes_to_megabytes, get_client_name
 
+from mpsl.utils.split_transport import TensorBoundary
+
 loss_fn = torch.nn.CrossEntropyLoss()
 
 
 class MPSLTrainer(ExperimentTrainer):
 
-    def __init__(self, fusion_type, modalities: list[InputModality]):
+    def __init__(self, fusion_type, modalities: list[InputModality], transport=None):
         super()
 
         self.is_using_late_fusion = 'late' in str(fusion_type).lower()
         self.modalities = modalities
+        self.transfer = TensorBoundary(transport)
 
     def _early_fusion_epoch(self, device, server_model, server_optimizer, client_data_iterators: dict, client_models: dict, client_model_requires_any_grad, client_optimizers: dict, max_nr_of_batches_in_epoch, global_args):
         client_ids = range(global_args.nr_of_clients)
@@ -63,18 +66,19 @@ class MPSLTrainer(ExperimentTrainer):
 
                 # Combine all intermediate activations to allow for a single FP
                 if intermediate_activations_entire_batch_combined is None:
-                    intermediate_activations_entire_batch_combined = intermediate_activations
+                    intermediate_activations_entire_batch_combined = self.transfer(intermediate_activations)
 
                     mini_batch_indices[client_id] = (0, len(intermediate_activations))
                 else:
                     client_begin_index = len(intermediate_activations_entire_batch_combined)
                     mini_batch_indices[client_id] = (client_begin_index, client_begin_index + len(y))
 
-                    intermediate_activations_entire_batch_combined = torch.cat((intermediate_activations_entire_batch_combined, intermediate_activations))
+                    intermediate_activations_entire_batch_combined = torch.cat((intermediate_activations_entire_batch_combined, self.transfer(intermediate_activations)))
 
             # Single full batch FP on server-side model
             final_activations = intermediate_activations_entire_batch_combined.detach().clone().requires_grad_(True)
             predictions = server_model(final_activations)
+            prediction_gradients = torch.zeros_like(predictions)
 
             for client_id in range(global_args.nr_of_clients):
                 if client_id not in mini_batch_indices:
@@ -82,19 +86,26 @@ class MPSLTrainer(ExperimentTrainer):
 
                 # Loss computation on client-side
                 client_mini_batch_indices = mini_batch_indices[client_id]
-                preds_for_client = predictions[client_mini_batch_indices[0]:client_mini_batch_indices[1]]
+                preds_for_client = self.transfer(predictions[client_mini_batch_indices[0]:client_mini_batch_indices[1]]).requires_grad_(True)
                 y_for_client = y_per_client[client_id]
                 mini_batch_length = len(y_for_client)
 
                 client_loss_fn = loss_fn(preds_for_client, y_for_client)
-                client_loss_fn_tuples.append((client_loss_fn, mini_batch_length))
+                # The loss graph stays on the client. Send its weighted logit gradient.
+                logit_gradient, = torch.autograd.grad(
+                    client_loss_fn * (mini_batch_length / len(predictions)), preds_for_client
+                )
+                logit_gradient = self.transfer(logit_gradient)
+                prediction_gradients[client_mini_batch_indices[0]:client_mini_batch_indices[1]] = logit_gradient
+                loss_payload = self.transfer(client_loss_fn)
+                client_loss_fn_tuples.append((loss_payload, mini_batch_length))
 
                 # = Communication tracking =
                 comms_size = get_communication_size(preds_for_client)
                 client_incoming_communication_sizes[client_id] += comms_size
                 server_outgoing_communication_size += comms_size
 
-                comms_size = get_communication_size(client_loss_fn)
+                comms_size = get_communication_size(logit_gradient) + get_communication_size(loss_payload)
                 client_outgoing_communication_sizes[client_id] += comms_size
                 server_incoming_communication_size += comms_size
 
@@ -111,7 +122,7 @@ class MPSLTrainer(ExperimentTrainer):
 
             total_server_loss += agg_loss.item() * sum(size for _, size in client_loss_fn_tuples)
 
-            agg_loss.backward()
+            predictions.backward(prediction_gradients)
 
             server_optimizer.step()
 
@@ -121,7 +132,7 @@ class MPSLTrainer(ExperimentTrainer):
                 for client_id in range(global_args.nr_of_clients):
                     if client_id in mini_batch_indices:
                         (client_begin_index, client_end_index) = mini_batch_indices[client_id]
-                        cut_layer_grads = final_activations.grad[client_begin_index:client_end_index].clone()
+                        cut_layer_grads = self.transfer(final_activations.grad[client_begin_index:client_end_index])
 
                         intermediate_activations_per_client[client_id].backward(cut_layer_grads)
                         client_optimizers[client_id].step()
@@ -190,7 +201,7 @@ class MPSLTrainer(ExperimentTrainer):
 
                     # Combine all intermediate activations for each modality to allow for a single FP per modality
                     if intermediate_activations_entire_batch_combined_for_modality[modality] is None:
-                        intermediate_activations_entire_batch_combined_for_modality[modality] = intermediate_activations[modality]
+                        intermediate_activations_entire_batch_combined_for_modality[modality] = self.transfer(intermediate_activations[modality])
 
                         mini_batch_indices[client_id] = (0, len(intermediate_activations[modality]))
                     else:
@@ -199,11 +210,12 @@ class MPSLTrainer(ExperimentTrainer):
                         if client_id not in mini_batch_indices:
                             mini_batch_indices[client_id] = (client_begin_index, client_begin_index + len(y))
 
-                        intermediate_activations_entire_batch_combined_for_modality[modality] = torch.cat((intermediate_activations_entire_batch_combined_for_modality[modality], intermediate_activations[modality]))
+                        intermediate_activations_entire_batch_combined_for_modality[modality] = torch.cat((intermediate_activations_entire_batch_combined_for_modality[modality], self.transfer(intermediate_activations[modality])))
 
             # Single full batch FP on server-side model
             final_activations_dict_for_modality = {modality: intermediate_activations_entire_batch_combined_for_modality[modality].detach().clone().requires_grad_(True) for modality in self.modalities}
             predictions = server_model(final_activations_dict_for_modality)
+            prediction_gradients = torch.zeros_like(predictions)
 
             for client_id in range(global_args.nr_of_clients):
                 if client_id not in mini_batch_indices:
@@ -211,19 +223,26 @@ class MPSLTrainer(ExperimentTrainer):
 
                 # Loss computation on client-side
                 client_mini_batch_indices = mini_batch_indices[client_id]
-                preds_for_client = predictions[client_mini_batch_indices[0]:client_mini_batch_indices[1]]
+                preds_for_client = self.transfer(predictions[client_mini_batch_indices[0]:client_mini_batch_indices[1]]).requires_grad_(True)
                 y_for_client = y_per_client[client_id]
                 mini_batch_length = len(y_for_client)
 
                 client_loss_fn = loss_fn(preds_for_client, y_for_client)
-                client_loss_fn_tuples.append((client_loss_fn, mini_batch_length))
+                # The loss graph stays on the client. Send its weighted logit gradient.
+                logit_gradient, = torch.autograd.grad(
+                    client_loss_fn * (mini_batch_length / len(predictions)), preds_for_client
+                )
+                logit_gradient = self.transfer(logit_gradient)
+                prediction_gradients[client_mini_batch_indices[0]:client_mini_batch_indices[1]] = logit_gradient
+                loss_payload = self.transfer(client_loss_fn)
+                client_loss_fn_tuples.append((loss_payload, mini_batch_length))
 
                 # = Communication tracking =
                 comms_size = get_communication_size(preds_for_client)
                 client_incoming_communication_sizes[client_id] += comms_size
                 server_outgoing_communication_size += comms_size
 
-                comms_size = get_communication_size(client_loss_fn)
+                comms_size = get_communication_size(logit_gradient) + get_communication_size(loss_payload)
                 client_outgoing_communication_sizes[client_id] += comms_size
                 server_incoming_communication_size += comms_size
 
@@ -240,7 +259,7 @@ class MPSLTrainer(ExperimentTrainer):
 
             total_server_loss += agg_loss.item() * sum(size for _, size in client_loss_fn_tuples)
 
-            agg_loss.backward()
+            predictions.backward(prediction_gradients)
 
             server_optimizer.step()
 
@@ -254,7 +273,7 @@ class MPSLTrainer(ExperimentTrainer):
                         if client_id in mini_batch_indices:
                             (client_begin_index, client_end_index) = mini_batch_indices[client_id]
                             final_activations = final_activations_dict_for_modality[modality]
-                            cut_layer_grads = final_activations.grad[client_begin_index:client_end_index].clone()
+                            cut_layer_grads = self.transfer(final_activations.grad[client_begin_index:client_end_index])
 
                             intermediate_activations_dict_for_modality[modality][client_id].backward(cut_layer_grads)
 

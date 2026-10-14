@@ -9,15 +9,18 @@ from mpsl.trainers.implementations.image_text_retrieval.metrics import compute_r
 from mpsl.trainers.implementations.experiment_results import ExperimentResults
 from mpsl.utils.mpsl_utils import get_communication_size, compute_aggregated_loss, bytes_to_megabytes, get_client_name
 
+from mpsl.utils.split_transport import TensorBoundary
+
 loss_fn = image_text_retrieval_loss
 metric = compute_recall_at_k
 
 
 class MPSLTrainer(ExperimentTrainer):
 
-    def __init__(self, nr_of_captions_per_image, test_set_size, batch_size, k_vals=[1, 5, 10], move_dist_matrix_to_cpu=False):
+    def __init__(self, nr_of_captions_per_image, test_set_size, batch_size, k_vals=[1, 5, 10], move_dist_matrix_to_cpu=False, transport=None):
         super()
 
+        self.transfer = TensorBoundary(transport)
         self.nr_of_captions_per_image = nr_of_captions_per_image
         self.test_set_size = test_set_size
         self.batch_size = batch_size
@@ -88,16 +91,16 @@ class MPSLTrainer(ExperimentTrainer):
                 server_incoming_communication_size += comms_size
 
                 if intermediate_activations_entire_batch_combined_image is None or intermediate_activations_entire_batch_combined_text is None:
-                    intermediate_activations_entire_batch_combined_image = image_intermediate_activations_per_client[client_id]
-                    intermediate_activations_entire_batch_combined_text = text_intermediate_activations_per_client[client_id]
+                    intermediate_activations_entire_batch_combined_image = self.transfer(image_intermediate_activations_per_client[client_id])
+                    intermediate_activations_entire_batch_combined_text = self.transfer(text_intermediate_activations_per_client[client_id])
 
                     mini_batch_indices[client_id] = (0, len(image_intermediate_activations_per_client[client_id]))
                 else:
                     client_begin_index = len(intermediate_activations_entire_batch_combined_image)
                     mini_batch_indices[client_id] = (client_begin_index, client_begin_index + len(image))
 
-                    intermediate_activations_entire_batch_combined_image = torch.cat((intermediate_activations_entire_batch_combined_image, image_intermediate_activations_per_client[client_id]))
-                    intermediate_activations_entire_batch_combined_text = torch.cat((intermediate_activations_entire_batch_combined_text, text_intermediate_activations_per_client[client_id]))
+                    intermediate_activations_entire_batch_combined_image = torch.cat((intermediate_activations_entire_batch_combined_image, self.transfer(image_intermediate_activations_per_client[client_id])))
+                    intermediate_activations_entire_batch_combined_text = torch.cat((intermediate_activations_entire_batch_combined_text, self.transfer(text_intermediate_activations_per_client[client_id])))
 
             # Single full batch FP on server-side model for each modality
             final_activations_image = intermediate_activations_entire_batch_combined_image.detach().clone().requires_grad_(True)
@@ -107,6 +110,7 @@ class MPSLTrainer(ExperimentTrainer):
                 InputModality.TEXT: final_activations_text
             })
             image, text = final_predictions[InputModality.IMAGE], final_predictions[InputModality.TEXT]
+            image_gradients, text_gradients = torch.zeros_like(image), torch.zeros_like(text)
 
             for client_id in range(global_args.nr_of_clients):
                 if client_id not in mini_batch_indices:
@@ -114,8 +118,8 @@ class MPSLTrainer(ExperimentTrainer):
 
                 # Loss computation on client-side
                 client_mini_batch_indices = mini_batch_indices[client_id]
-                image_for_client = image[client_mini_batch_indices[0]:client_mini_batch_indices[1]]
-                text_for_client = text[client_mini_batch_indices[0]:client_mini_batch_indices[1]]
+                image_for_client = self.transfer(image[client_mini_batch_indices[0]:client_mini_batch_indices[1]]).requires_grad_(True)
+                text_for_client = self.transfer(text[client_mini_batch_indices[0]:client_mini_batch_indices[1]]).requires_grad_(True)
 
                 mini_batch_length = len(image_for_client)
 
@@ -128,14 +132,23 @@ class MPSLTrainer(ExperimentTrainer):
 
                     client_nr_correct += _client_nr_correct
 
-                client_loss_fn_tuples.append((client_loss_fn, mini_batch_length))
+                # Keep local negatives and the sum across captions unchanged.
+                image_gradient, text_gradient = torch.autograd.grad(
+                    client_loss_fn * (mini_batch_length / len(image)),
+                    (image_for_client, text_for_client),
+                )
+                image_gradient, text_gradient = self.transfer(image_gradient), self.transfer(text_gradient)
+                image_gradients[client_mini_batch_indices[0]:client_mini_batch_indices[1]] = image_gradient
+                text_gradients[client_mini_batch_indices[0]:client_mini_batch_indices[1]] = text_gradient
+                loss_payload = self.transfer(client_loss_fn)
+                client_loss_fn_tuples.append((loss_payload, mini_batch_length))
 
                 # = Communication tracking =
                 comms_size = get_communication_size(image_for_client) + get_communication_size(text_for_client)
                 client_incoming_communication_sizes[client_id] += comms_size
                 server_outgoing_communication_size += comms_size
 
-                comms_size = get_communication_size(client_loss_fn)
+                comms_size = get_communication_size(image_gradient) + get_communication_size(text_gradient) + get_communication_size(loss_payload)
                 client_outgoing_communication_sizes[client_id] += comms_size
                 server_incoming_communication_size += comms_size
 
@@ -150,7 +163,7 @@ class MPSLTrainer(ExperimentTrainer):
 
             total_server_loss += agg_loss.item()
 
-            agg_loss.backward()
+            torch.autograd.backward((image, text), (image_gradients, text_gradients))
 
             server_optimizer.step()
 
@@ -161,7 +174,7 @@ class MPSLTrainer(ExperimentTrainer):
                     for client_id in range(global_args.nr_of_clients):
                         if client_id in mini_batch_indices:
                             (client_begin_index, client_end_index) = mini_batch_indices[client_id]
-                            cut_layer_grads = final_activations.grad[client_begin_index:client_end_index].clone()
+                            cut_layer_grads = self.transfer(final_activations.grad[client_begin_index:client_end_index])
 
                             intermediate_client_activations[client_id].backward(cut_layer_grads)
 
