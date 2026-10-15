@@ -1,8 +1,4 @@
-"""Read-only import of acquired paper datasets into validated training manifests.
-
-Media stays in its source directory. No constructor downloads, archive extraction,
-renaming, cache pickle loading, or deletion is performed.
-"""
+"""Acquire and prepare the seven paper datasets for MPSL training."""
 
 import argparse
 from collections import Counter
@@ -249,6 +245,7 @@ def _records(dataset, source, samples_file=None):
                     candidates = [
                         relative,
                         spaced,
+                        f"kinetics-sounds/{relative}",
                         f"kinetics-sounds/{spaced}",
                         f"k400/videos/train/{spaced}",
                         f"kinetics-dataset/k400/videos/train/{spaced}",
@@ -402,7 +399,7 @@ def load_manifest(root, dataset):
     path = Path(root) / dataset / "manifest.json"
     if not path.is_file():
         raise FileNotFoundError(
-            f'Missing {path}. Run python scripts/prepare_data.py --dataset {dataset} --root "{root}" --source /path/to/acquired/data'
+            f'Missing {path}. Run python scripts/prepare_data.py --dataset {dataset} --root "{root}"'
         )
     manifest = json.loads(path.read_text())
     if manifest.get("schema_version") != 1 or manifest.get("dataset") != dataset:
@@ -427,69 +424,82 @@ def validate_dataset(root, dataset, *, check_media=False):
 
 
 def main(argv=None):
+    from .acquisition import MANUAL, acquire_sources, ensure_encoder
+    from .downloads import preparation_lock
+
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--dataset", required=True, choices=DATASETS)
-    parser.add_argument(
-        "--root",
-        required=True,
-        type=Path,
-        help="Prepared dataset root consumed by --torch_data_dir",
-    )
-    parser.add_argument(
-        "--source",
-        type=Path,
-        help="Acquired, extracted original dataset root (read only)",
-    )
-    parser.add_argument(
-        "--samples-file",
-        type=Path,
-        help="Explicit UCF/Kinetics/MELD subset in the shipped sample-list format; recorded as custom",
-    )
-    parser.add_argument(
-        "--validate",
-        action="store_true",
-        help="Validate existing manifest and all referenced files",
-    )
-    parser.add_argument(
-        "--hash-media",
-        action="store_true",
-        help="SHA256 every source media file; reads the entire corpus",
-    )
-    parser.add_argument(
-        "--check-media",
-        action="store_true",
-        help="Fully decode audio and video (images always fully decoded)",
-    )
+    parser.add_argument("--dataset", choices=(*DATASETS, "all"), help="Dataset to prepare; default: all seven")
+    parser.add_argument("--root", type=Path, default=Path("data"), help="Prepared dataset root (default: data)")
+    parser.add_argument("--source", type=Path, help="Raw files and download cache (default: raw)")
+    parser.add_argument("--weights-dir", type=Path, default=Path("checkpoints"), help="Encoder checkpoint folder")
+    parser.add_argument("--samples-file", type=Path, help="Custom UCF101/Kinetics/MELD sample list")
+    parser.add_argument("--validate", action="store_true", help="Check existing datasets without downloads or writes")
+    parser.add_argument("--no-download", action="store_true", help="Use existing local sources and weights only")
+    parser.add_argument("--skip-weights", action="store_true", help="Prepare datasets without acquiring the base encoder")
+    parser.add_argument("--hash-media", action="store_true", help="Record SHA256 hashes of every media file")
+    parser.add_argument("--check-media", action="store_true", help="Fully decode audio/video (images always decoded)")
+    parser.add_argument("--list", action="store_true", help="List dataset keys and access requirements")
     args = parser.parse_args(argv)
+    if args.list:
+        for dataset in DATASETS:
+            print(f"{dataset}: {MANUAL.get(dataset, 'Automatic download and preparation')}")
+        return 0
+    selected = [args.dataset] if args.dataset and args.dataset != "all" else list(DATASETS)
+    if args.samples_file and (len(selected) != 1 or selected[0] not in ("ucf101", "kinetics-sounds", "meld")):
+        parser.error("--samples-file requires one of ucf101, kinetics-sounds or meld")
+    if args.validate and (args.source or args.samples_file or args.hash_media):
+        parser.error("--validate uses saved sources and hashing policy; do not pass import options")
+    source = (args.source or Path("raw")).resolve()
+    statuses = []
+
+    def process(dataset):
+        manifest_path = args.root / dataset / "manifest.json"
+        if args.validate or manifest_path.is_file():
+            manifest = validate_dataset(args.root, dataset, check_media=args.check_media)
+            if args.source and Path(manifest["source_root"]).resolve() != source:
+                raise ValueError("Existing manifest uses another --source; use a separate --root")
+            if args.hash_media and any("sha256" not in item for item in manifest["files"].values()):
+                raise ValueError("Existing preparation has no media hashes; choose a new --root with --hash-media")
+            if args.samples_file and not any(Path(a["path"]) == args.samples_file.resolve() for a in manifest["annotations"]):
+                raise ValueError("Existing preparation uses another sample list; choose a new --root")
+            return manifest
+        if not args.no_download:
+            acquire_sources(dataset, source, samples_file=args.samples_file)
+        return prepare_dataset(dataset, args.root, source, samples_file=args.samples_file,
+                               hash_media=args.hash_media, check_media=args.check_media)
+
+    def process_all():
+        for dataset in selected:
+            print(f"[{dataset}] Preparing...", flush=True)
+            try:
+                result = process(dataset)
+                statuses.append((dataset, True))
+                print(f"[{dataset}] Ready: {result['counts']['train']:,} train / {result['counts']['test']:,} test", flush=True)
+            except (OSError, ValueError, RuntimeError) as error:
+                statuses.append((dataset, False))
+                print(f"[{dataset}] Incomplete: {error}", flush=True)
+                if dataset in MANUAL:
+                    print(MANUAL[dataset].replace("raw/", f"{source}/"), flush=True)
+        if not args.validate and not args.skip_weights and any(ok for _, ok in statuses):
+            try:
+                path = ensure_encoder(args.weights_dir, allow_download=not args.no_download)
+                print(f"[encoder] Ready: {path}", flush=True)
+            except (OSError, ValueError, RuntimeError, ImportError) as error:
+                statuses.append(("encoder", False))
+                print(f"[encoder] Incomplete: {error}", flush=True)
+        failed = [name for name, ok in statuses if not ok]
+        print("Complete." if not failed else f"Incomplete: {', '.join(failed)}. Resolve the messages above and rerun the same command.")
+        return int(bool(failed))
+
     if args.validate:
-        if args.source or args.samples_file or args.hash_media:
-            parser.error(
-                "--validate uses the saved sources and hashing policy; do not pass import options"
-            )
-        result = validate_dataset(args.root, args.dataset, check_media=args.check_media)
-    else:
-        if args.source is None:
-            parser.error("--source is required when preparing a dataset")
-        result = prepare_dataset(
-            args.dataset,
-            args.root,
-            args.source,
-            samples_file=args.samples_file,
-            hash_media=args.hash_media,
-            check_media=args.check_media,
-        )
-    print(
-        json.dumps(
-            {
-                "dataset": args.dataset,
-                "counts": result["counts"],
-                "classes": len(result["class_to_idx"]),
-                "manifest": str(args.root.resolve() / args.dataset / "manifest.json"),
-            },
-            indent=2,
-        )
-    )
+        return process_all()
+    try:
+        with preparation_lock(source):
+            return process_all()
+    except RuntimeError as error:
+        print(error)
+        return 1
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

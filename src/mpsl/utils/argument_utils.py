@@ -1,4 +1,5 @@
 import argparse
+import math
 import os
 from pathlib import Path
 
@@ -17,6 +18,17 @@ from mpsl.models.meta_transformer.base.meta_transformer import trainable_params_
 
 
 def validate_base_argument_constraints(argument_parser):
+    for name in ('batch_size', 'nr_of_epochs', 'scheduler_step_size', 'nr_of_clients'):
+        if hasattr(argument_parser, name) and getattr(argument_parser, name) <= 0:
+            raise ValueError(f'{name} must be positive')
+    for name in ('num_workers', 'test_num_workers'):
+        if hasattr(argument_parser, name) and getattr(argument_parser, name) < 0:
+            raise ValueError(f'{name} must be nonnegative')
+    if not math.isfinite(argument_parser.start_lr) or argument_parser.start_lr < 0:
+        raise ValueError('start_lr must be finite and nonnegative')
+    if hasattr(argument_parser, 'dirichlet_alpha'):
+        if not math.isfinite(argument_parser.dirichlet_alpha) or argument_parser.dirichlet_alpha <= 0:
+            raise ValueError('dirichlet_alpha must be finite and positive')
     if argument_parser.audio_time_dimension is None:
         argument_parser.audio_time_dimension = '3.88s' if argument_parser.dataset == 'meld' else '10.24s'
     if argument_parser.vit_base != 'None':

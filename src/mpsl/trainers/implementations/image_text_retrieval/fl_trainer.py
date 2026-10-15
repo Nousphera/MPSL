@@ -133,6 +133,7 @@ class FLTrainer(ExperimentTrainer):
         for client_id in client_models.keys():
             with torch.no_grad():
                 client_models[client_id] = client_models[client_id].switch_to_device(desired_device)
+                client_models[client_id].eval()
                 client_name = AGGREGATED_MODEL_NAME if str(client_id) == AGGREGATED_MODEL_NAME else get_client_name(client_id)
 
                 t2i_recall, i2t_recall = metric(desired_device, client_models[client_id], client_data_iterators[client_id], self.k_vals, self.batch_size,
@@ -166,8 +167,8 @@ class FLTrainer(ExperimentTrainer):
                     if should_add_experiment_results:
                         i2t_recall_as_numerics_list.append(float(value))
 
-        if should_add_experiment_results:
-            experiment_results.add_results(epoch_nr, [t2i_recall_as_numerics_list, i2t_recall_as_numerics_list], True)
+                if should_add_experiment_results:
+                    experiment_results.add_results(epoch_nr, [t2i_recall_as_numerics_list, i2t_recall_as_numerics_list], True)
 
         return results_as_string
 

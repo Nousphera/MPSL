@@ -35,10 +35,10 @@ def test_openai_token_ids_and_truncation_without_loading_weights(monkeypatch):
     torch.testing.assert_close(out, expected)
 
 
-def test_cifar_import_does_not_disable_https_certificate_checks():
+def test_dataset_import_does_not_disable_https_certificate_checks():
     original = ssl._create_default_https_context
     module = importlib.import_module(
-        "mpsl.available_datasets.unimodal.image_classification.cifar100"
+        "mpsl.available_datasets.multimodal.vqa.coco_qa"
     )
     importlib.reload(module)
     assert ssl._create_default_https_context is original

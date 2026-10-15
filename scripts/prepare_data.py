@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Prepare sources for the actual MPSL experiment loaders."""
+"""Download and prepare MPSL datasets and the base encoder."""
 from mpsl.available_datasets.preparation import main
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

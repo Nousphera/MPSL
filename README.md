@@ -44,33 +44,29 @@ python -m pip install -r requirements.txt
 
 ## Data and weights
 
-Download [COCO-QA annotations](https://www.cs.toronto.edu/~mren/research/imageqa/data/cocoqa/) and [COCO 2014 images](https://cocodataset.org/#download), then prepare the data:
+Download, extract and validate a dataset, including the pretrained base encoder:
 
 ```bash
-python scripts/prepare_data.py --dataset coco-qa --source raw --root data
-python scripts/prepare_data.py --dataset coco-qa --root data --validate
-mkdir -p checkpoints
+# One dataset
+python scripts/prepare_data.py --dataset coco-qa
+
+# All datasets
+python scripts/prepare_data.py
 ```
 
-<details>
-<summary><strong>Datasets</strong></summary>
+**Datasets:** `coco-qa` · `coco-retrieval` · `flickr30k` · `t4sa` · `ucf101` · `kinetics-sounds` · `meld`.
 
-| Dataset / source | Folder in `raw/` |
+For datasets requiring access, download the following files before running the same command:
+
+| Dataset | Download and place in `raw/` |
 | :--- | :--- |
-| [`coco-qa`](https://www.cs.toronto.edu/~mren/research/imageqa/data/cocoqa/) · [images](https://cocodataset.org/#download) | `coco-qa/`<br>`ms-coco/` |
-| [`coco-retrieval`](https://cocodataset.org/#download) · [annotations](https://cs.stanford.edu/people/karpathy/deepimagesent/) | `ms-coco/`<br>`karpathy/` |
-| [`flickr30k`](https://shannon.cs.illinois.edu/DenotationGraph/) · [annotations](https://cs.stanford.edu/people/karpathy/deepimagesent/) | `flickr30k-images/`<br>`karpathy/` |
-| [`t4sa`](http://www.t4sa.it/) | `b-t4sa/` |
-| [`ucf101`](https://www.crcv.ucf.edu/data/UCF101.php) | `UCF-101/` |
-| [`kinetics-sounds`](https://github.com/cvdfoundation/kinetics-dataset) | `k400/` |
-| [`meld`](https://affective-meld.github.io/) | `MELD.Raw/` |
+| [Flickr30K](https://shannon.cs.illinois.edu/DenotationGraph/) | Images at `flickr30k-images/<image>.jpg`, or the archive as `flickr30k-images.tar.gz`. Annotations download automatically. |
+| [T4SA](http://www.t4sa.it/) | `b-t4sa_imgs.tar` and `raw_tweets_text.csv`. Alternatively, extract under `b-t4sa/` with `data/`, `b-t4sa_train.txt`, `b-t4sa_test.txt` and the CSV. |
 
-</details>
-
-Place the [Meta-Transformer base encoder](https://github.com/invictus717/MetaTransformer#-model-zoo) at `checkpoints/Meta-Transformer_base_patch16_encoder.pth`.
+Sources stay in `raw/`, manifests in `data/`, and the [Meta-Transformer base encoder](https://github.com/invictus717/MetaTransformer#-model-zoo) in `checkpoints/`. Rerun to resume interrupted downloads or check prepared data.
 
 > [!NOTE]
-> Image/text and AST audio tokenizers load on first use.
+> Kinetics-Sounds scans several hundred GB of official K400 archives, retaining only the paper's clips. Image/text and AST audio tokenizers load on first use.
 
 ## Run Experiments
 

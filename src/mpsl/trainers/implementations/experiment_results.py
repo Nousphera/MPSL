@@ -1,11 +1,8 @@
-from typing import List
-
-
 class ExperimentResults:
     def __init__(self, arguments=None):
         self.configuration = dict(vars(arguments)) if arguments is not None else None
         self.dataset_provenance = None
-        if arguments is not None and arguments.dataset != 'cifar100':
+        if arguments is not None:
             from pathlib import Path
             from mpsl.available_datasets.preparation import load_manifest, sha256
             manifest = load_manifest(arguments.torch_data_dir, arguments.dataset)

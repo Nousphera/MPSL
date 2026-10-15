@@ -103,7 +103,7 @@ def test_default_paths_create_local_run_directories(tmp_path, monkeypatch):
     ):
         monkeypatch.setenv(key, "previous-value")
     args = build_base_argument_parser().parse_args(
-        ["--dataset", "cifar100", "--save_file_name", "run"]
+        ["--dataset", "coco-qa", "--save_file_name", "run"]
     )
     set_env_variables(args)
     for key, relative_path in {
@@ -121,7 +121,7 @@ def test_explicit_paths_are_created_without_overwriting_files(tmp_path, monkeypa
     existing.write_text("keep this file")
     args = build_base_argument_parser().parse_args(
         [
-            "--dataset", "cifar100", "--save_file_name", "run",
+            "--dataset", "coco-qa", "--save_file_name", "run",
             "--torch_data_dir", str(tmp_path / "custom-data"),
             "--pre_processors_cache_dir", str(existing),
             "--tokenizer_weights_cache_dir", str(tmp_path / "custom-tokenizers"),

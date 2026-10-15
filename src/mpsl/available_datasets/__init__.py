@@ -7,7 +7,7 @@ import torch
 # Import only the selected dataset; registry inspection performs no downloads.
 from importlib import import_module
 
-dataloaders = {'cifar100': ('mpsl.available_datasets.unimodal.image_classification.cifar100', 'CIFAR100'), 'coco-qa': ('mpsl.available_datasets.multimodal.vqa.coco_qa', 'COCO_QA'), 't4sa': ('mpsl.available_datasets.multimodal.sentiment_analysis.t4sa', 'T4SA'), 'coco-retrieval': ('mpsl.available_datasets.multimodal.image_text_retrieval.coco_retrieval', 'CocoRetrieval'), 'flickr30k': ('mpsl.available_datasets.multimodal.image_text_retrieval.flickr30k', 'Flickr30K'), 'ucf101': ('mpsl.available_datasets.multimodal.action_recognition.ucf_101', 'UCF101'), 'kinetics-sounds': ('mpsl.available_datasets.multimodal.action_recognition.kinetics_sounds', 'KineticsSounds'), 'meld': ('mpsl.available_datasets.multimodal.emotion_recognition.meld', 'MELD')}
+dataloaders = {'coco-qa': ('mpsl.available_datasets.multimodal.vqa.coco_qa', 'COCO_QA'), 't4sa': ('mpsl.available_datasets.multimodal.sentiment_analysis.t4sa', 'T4SA'), 'coco-retrieval': ('mpsl.available_datasets.multimodal.image_text_retrieval.coco_retrieval', 'CocoRetrieval'), 'flickr30k': ('mpsl.available_datasets.multimodal.image_text_retrieval.flickr30k', 'Flickr30K'), 'ucf101': ('mpsl.available_datasets.multimodal.action_recognition.ucf_101', 'UCF101'), 'kinetics-sounds': ('mpsl.available_datasets.multimodal.action_recognition.kinetics_sounds', 'KineticsSounds'), 'meld': ('mpsl.available_datasets.multimodal.emotion_recognition.meld', 'MELD')}
 
 
 class Subset(torch.utils.data.Subset):
@@ -164,13 +164,6 @@ class DirichletDataPartitioner:
 
 		return Subset(self.dataset, indices)
 
-	@property
-	def num_partitions(self) -> int:
-		self._determine_partition_id_to_indices_if_needed()
-
-		return self._num_partitions
-
-
 class DistributedDataset(torch.utils.data.Dataset):
 	"""
 	As per FederatedDataset of https://github.com/adap/flower
@@ -251,7 +244,7 @@ def available_datasets():
 	return list(dataloaders.keys())
 
 
-def load_data(name='cifar100', num_partitions=10, min_num_samples=10, split='iid', seed=42, transform=None, global_args=None):
+def load_data(name='coco-qa', num_partitions=10, min_num_samples=10, split='iid', seed=42, transform=None, global_args=None):
 	assert name in dataloaders.keys(), 'Dataset `{}` is not available. Available datasets are `{}`'.format(name, available_datasets())
 
 	if split == 'iid':
