@@ -2,7 +2,7 @@
 
 ## Source
 
-This revision derives from the authors' public MPSL source at commit `5fa2c84142102555d84448fd3dfcb0f756798b83`. Original history, dataset implementations, model variants and licensing remain available. Entry points moved into the installable `mpsl` package; historical environment pins are preserved in `requirements-original.txt`.
+This revision derives from the authors' public MPSL source at commit `5fa2c84142102555d84448fd3dfcb0f756798b83`. Original history, dataset implementations, model variants and licensing remain available. Entry points moved into the installable `mpsl` package; historical environment pins are preserved in [the historical dependency transcript](HISTORICAL_REQUIREMENTS.md). That unmaintained transcript is not an installation recipe. The maintained experiment environment requires Pillow 12.3 or later within the 12.x series; the tested snapshot records 12.3.0.
 
 Reference: [arXiv:2502.06355](https://arxiv.org/abs/2502.06355). The paper evaluates paired multimodal supervised tasks with a shared server encoder. This release does not extend those results to unsupervised domain adaptation, arbitrary missing modalities, asynchronous workers or a real distributed privacy protocol.
 

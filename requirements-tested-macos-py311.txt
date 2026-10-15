@@ -1,4 +1,4 @@
-# Validated macOS arm64 / Python 3.11.15; clean setup-script environment.
+# Validated macOS arm64 / Python 3.11.15; Pillow 12.3 overlay on clean setup environment.
 annotated-doc==0.0.5
 anyio==4.15.1
 av==15.1.0
@@ -28,7 +28,7 @@ networkx==3.6.1
 numpy==2.4.6
 open_clip_torch==3.3.0
 packaging==26.3
-pillow==11.3.0
+pillow==12.3.0
 pluggy==1.6.0
 portalocker==4.4.0
 Pygments==2.21.0

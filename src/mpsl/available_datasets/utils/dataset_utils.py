@@ -6,9 +6,7 @@ import random
 import torch
 import torchaudio
 import torchvision
-import transformers
 from torchvision.datasets.utils import download_and_extract_archive
-from mpsl.available_datasets.utils.media import read_video_audio
 
 
 def download_and_extract_data(data_pairs_to_download):
@@ -160,6 +158,7 @@ class VideoAudioDataset(torch.utils.data.Dataset):
             include_video_modality=True,
             **kwargs
     ):
+        import transformers
 
         self.video_files, self.targets = video_files, targets
 
@@ -213,6 +212,8 @@ class VideoAudioDataset(torch.utils.data.Dataset):
         return [video_start, video_end], [audio_start, audio_end]
 
     def __getitem__(self, idx):
+        from mpsl.available_datasets.utils.media import read_video_audio
+
         fp, label = self.video_files[idx], self.targets[idx]
         video, audio, info = read_video_audio(fp)
         if 'audio_fps' not in info.keys():
