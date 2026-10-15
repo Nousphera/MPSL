@@ -5,7 +5,7 @@ PYTHON_BIN="${PYTHON_BIN:-python3.11}"
 VENV_DIR="${VENV_DIR:-.venv}"
 "$PYTHON_BIN" -c 'import sys; assert (3, 11) <= sys.version_info[:2] < (3, 13), "Use Python 3.11 or 3.12"'
 if [[ ! -e "$VENV_DIR" ]]; then
-  "$PYTHON_BIN" -m venv "$VENV_DIR"
+  "$PYTHON_BIN" -m venv --prompt mpsl "$VENV_DIR"
 elif [[ ! -f "$VENV_DIR/pyvenv.cfg" ]]; then
   echo "$VENV_DIR exists and is not a virtual environment" >&2; exit 2
 fi

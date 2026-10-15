@@ -27,16 +27,16 @@
 
 ## Setup
 
-Create a `.venv` and install all required packages:
+Create and activate the `mpsl` environment:
 
 ```bash
 git clone https://github.com/Nousphera/MPSL.git
 cd MPSL
-bash scripts/setup.sh
+python3.11 -m venv --prompt mpsl .venv
 source .venv/bin/activate
 ```
 
-For an existing environment, install the requirements with:
+From the activated `mpsl` environment, install the requirements:
 
 ```bash
 python -m pip install -r requirements.txt
