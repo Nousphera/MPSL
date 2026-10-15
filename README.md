@@ -65,27 +65,6 @@ Each epoch evaluates on the test split. Metrics and weights are saved to `checkp
 
 **[Baselines and configuration →](docs/experiments.md#training-and-baselines)** · **[Published results →](https://nousphera.github.io/MPSL/#findings)**
 
-## Check the installation
-
-```bash
-python -m pytest -q
-python -m mpsl.smoke --output runs/check
-```
-
-The check exercises both fusion paths with the full ViT-B/16 architecture, random initialization and synthetic inputs; it needs no datasets or downloaded weights. Use a new output directory for each run.
-
-## Code structure
-
-| Path | Purpose |
-| :--- | :--- |
-| `src/mpsl/models/` | Tokenizers, encoder and task heads |
-| `src/mpsl/trainers/` | Split, centralized and federated training |
-| `src/mpsl/available_datasets/` | Preparation and multimodal loaders |
-| `src/mpsl/utils/` | Tensor exchange, partitions and checkpoints |
-| `tests/` | Models, gradients, data and runtime checks |
-
-The implementation simulates client/server tensor exchange in one process. **[Method and communication →](docs/method.md)**
-
 ## Citation
 
 ```bibtex
