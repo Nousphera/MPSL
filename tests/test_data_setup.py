@@ -275,3 +275,31 @@ def test_encoder_failure_is_an_actionable_setup_status(tmp_path, monkeypatch, ca
     assert preparation.main(["--dataset", "coco-qa"]) == 1
     assert "[encoder] Incomplete" in capsys.readouterr().out
     assert (tmp_path / "data/coco-qa/manifest.json").is_file()
+
+
+@pytest.mark.parametrize("existing", [False, True])
+def test_encoder_script_reports_invalid_local_weights_without_downloading(tmp_path, existing):
+    import subprocess
+    import sys
+    from mpsl.available_datasets.acquisition import ENCODER_NAME
+    directory = tmp_path / "checkpoints"
+    if existing:
+        directory.mkdir()
+        (directory / ENCODER_NAME).write_bytes(b"invalid checkpoint")
+    script = Path(__file__).resolve().parents[1] / "scripts/prepare_metatransformer.py"
+    result = subprocess.run(
+        [sys.executable, str(script), "--validate"], cwd=tmp_path,
+        capture_output=True, text=True, timeout=30,
+    )
+    assert result.returncode == 1
+    assert "[encoder] Incomplete:" in result.stdout
+    assert "Traceback" not in result.stderr
+    assert directory.exists() == existing
+
+
+def test_encoder_preparation_lock_is_shared_between_entrypoints(tmp_path):
+    from mpsl.available_datasets.acquisition import ensure_encoder
+    from mpsl.available_datasets.downloads import preparation_lock
+    with preparation_lock(tmp_path, name=".encoder.lock"):
+        with pytest.raises(RuntimeError, match="Another preparation"):
+            ensure_encoder(tmp_path)

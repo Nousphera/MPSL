@@ -19,12 +19,12 @@ from tqdm import tqdm
 
 
 @contextmanager
-def preparation_lock(root):
+def preparation_lock(root, *, name=".prepare.lock"):
     """Prevent two setup processes from writing the same cache/manifests."""
     import fcntl
     root = Path(root)
     root.mkdir(parents=True, exist_ok=True)
-    with (root / ".prepare.lock").open("a") as stream:
+    with (root / name).open("a") as stream:
         try:
             fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError as error:

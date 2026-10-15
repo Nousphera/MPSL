@@ -6,7 +6,7 @@ from pathlib import Path
 import pickle
 from urllib.parse import urlparse
 
-from .downloads import download, extract_archive
+from .downloads import download, extract_archive, preparation_lock
 
 
 @dataclass(frozen=True)
@@ -164,13 +164,20 @@ def _kinetics(source, samples_file):
 
 def ensure_encoder(directory, *, allow_download=True):
     """Download the authors' base encoder once and verify all tensor names/shapes."""
+    if not allow_download:
+        return _ensure_encoder(directory, allow_download=False)
+    with preparation_lock(directory, name=".encoder.lock"):
+        return _ensure_encoder(directory, allow_download=True)
+
+
+def _ensure_encoder(directory, *, allow_download):
     import torch
     from timm.models.vision_transformer import Block
     directory = Path(directory)
     target = directory / ENCODER_NAME
     if not target.is_file():
         if not allow_download:
-            raise FileNotFoundError(f"Place https://drive.google.com/file/d/{ENCODER_ID}/view at {target}, or rerun without --no-download.")
+            raise FileNotFoundError(f"Missing {target}. Run python scripts/prepare_metatransformer.py --weights-dir \"{directory}\" to download it.")
         import gdown
         from gdown.exceptions import FileURLRetrievalError
         from requests.exceptions import RequestException
