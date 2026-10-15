@@ -188,7 +188,7 @@ class AudioTextDataset(PreparedDataset):
         self.clip_duration = num_patches * tubelet_size / video_frame_rate
         # Preserve MELD frontend dimensions: 2.56-second clip padded
         # to 122880 samples *after* resampling to 16 kHz, hence 766 mel frames.
-        # The model option historically called this "3.88s"; see DATASETS.md.
+        # The model option historically called this "3.88s"; see README.md#train-and-evaluate.
         self.feature_duration = 7.68
 
     def __getitem__(self, index):
