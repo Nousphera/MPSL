@@ -72,7 +72,7 @@ Place the [Meta-Transformer base encoder](https://github.com/invictus717/MetaTra
 > [!NOTE]
 > Image/text and AST audio tokenizers load on first use.
 
-## Train and evaluate
+## Run Experiments
 
 From the repository root, set the shared options and run your chosen method:
 
