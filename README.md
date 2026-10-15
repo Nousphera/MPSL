@@ -51,25 +51,24 @@ mkdir -p checkpoints
 ```
 
 <details>
-<summary><strong>Dataset sources and layouts</strong></summary>
+<summary><strong>Datasets</strong></summary>
 
-Paths below are relative to `raw/`. Replace `coco-qa` in the commands with the dataset key.
-
-| Dataset key | Source | Extracted layout |
-| :--- | :--- | :--- |
-| `coco-qa` | [Annotations](https://www.cs.toronto.edu/~mren/research/imageqa/data/cocoqa/) · [Images](https://cocodataset.org/#download) | `coco-qa/{train,test}/{questions,img_ids,answers}.txt`; `ms-coco/{train2014,val2014}/*.jpg` |
-| `coco-retrieval` | [COCO images](https://cocodataset.org/#download) · [Karpathy annotations](https://cs.stanford.edu/people/karpathy/deepimagesent/) | `ms-coco/{train2014,val2014}/*.jpg`; `karpathy/dataset_coco.json` |
-| `flickr30k` | [Images](https://shannon.cs.illinois.edu/DenotationGraph/) · [Karpathy annotations](https://cs.stanford.edu/people/karpathy/deepimagesent/) | `flickr30k-images/*.jpg`; `karpathy/dataset_flickr30k.json` |
-| `t4sa` | [B-T4SA](http://www.t4sa.it/) | `b-t4sa/b-t4sa_{train,test}.txt`; `b-t4sa/raw_tweets_text.csv` (`id,text`); `b-t4sa/data/` |
-| `ucf101` | [UCF101](https://www.crcv.ucf.edu/data/UCF101.php) | `UCF-101/<class>/*.avi`; shipped list selects the 51-class audio subset |
-| `kinetics-sounds` | [Kinetics-400](https://github.com/cvdfoundation/kinetics-dataset) | `k400/videos/<split>/<class>/*.mp4`; shipped list selects 30 classes |
-| `meld` | [MELD raw media](https://affective-meld.github.io/) | `MELD.Raw/{train/train_splits,dev/dev_splits_complete,test/output_repeated_splits_test}/*.mp4` |
-
-Preparation retains the original files in place. Keep `raw/` available. Add `--check-media` for full media decoding or `--hash-media` for content hashes. Retrieval uses the annotated train/test splits and five captions per image. MELD combines training/dev clips and preserves its numeric class map.
+| Dataset / source | Folder in `raw/` |
+| :--- | :--- |
+| [`coco-qa`](https://www.cs.toronto.edu/~mren/research/imageqa/data/cocoqa/) · [images](https://cocodataset.org/#download) | `coco-qa/`<br>`ms-coco/` |
+| [`coco-retrieval`](https://cocodataset.org/#download) · [annotations](https://cs.stanford.edu/people/karpathy/deepimagesent/) | `ms-coco/`<br>`karpathy/` |
+| [`flickr30k`](https://shannon.cs.illinois.edu/DenotationGraph/) · [annotations](https://cs.stanford.edu/people/karpathy/deepimagesent/) | `flickr30k-images/`<br>`karpathy/` |
+| [`t4sa`](http://www.t4sa.it/) | `b-t4sa/` |
+| [`ucf101`](https://www.crcv.ucf.edu/data/UCF101.php) | `UCF-101/` |
+| [`kinetics-sounds`](https://github.com/cvdfoundation/kinetics-dataset) | `k400/` |
+| [`meld`](https://affective-meld.github.io/) | `MELD.Raw/` |
 
 </details>
 
-Place the [Meta-Transformer base encoder](https://github.com/invictus717/MetaTransformer#-model-zoo) at `checkpoints/Meta-Transformer_base_patch16_encoder.pth`. Image/text and AST audio tokenizers load on first use; caches are stored under `cache/` and the Hugging Face cache.
+Place the [Meta-Transformer base encoder](https://github.com/invictus717/MetaTransformer#-model-zoo) at `checkpoints/Meta-Transformer_base_patch16_encoder.pth`.
+
+> [!NOTE]
+> Image/text and AST audio tokenizers load on first use.
 
 ## Train and evaluate
 
@@ -82,28 +81,29 @@ python -m mpsl.main_mpsl \
   --save_file_name cocoqa-mpsl
 ```
 
-Each epoch evaluates on the test split. Metrics and weights are saved to `checkpoints/cocoqa-mpsl.{json,pth}`. Use a distinct save name per run and a server batch size divisible by the client count.
+> [!NOTE]
+> Metrics and weights are saved to `checkpoints/cocoqa-mpsl.{json,pth}`.
 
 <details>
-<summary><strong>Baselines and configuration</strong></summary>
+<summary><strong>Baselines</strong></summary>
 
-Adapt the command above:
+| Method | Module |
+| :--- | :--- |
+| Centralized | `mpsl.main_centralized` |
+| FedAvg | `mpsl.main_fl` |
+| FedCLIP | `mpsl.main_fl` + adapters |
 
-| Method | Module | Changes |
-| :--- | :--- | :--- |
-| Centralized | `mpsl.main_centralized` | Omit `--nr_of_clients`, `--dataset_split_type`, `--dirichlet_alpha`, `--test_num_workers` |
-| FedAvg | `mpsl.main_fl` | Omit `--test_num_workers` |
-| FedCLIP | `mpsl.main_fl` | Omit `--test_num_workers`; add `--use_adapter_approach True --include_image_adapter True --include_text_adapter True` |
+Omit `--test_num_workers` for all baselines. For centralized training, also omit `--nr_of_clients`, `--dataset_split_type` and `--dirichlet_alpha`.
 
-Keep data, seed and partitions fixed across comparisons. The default learning rate is `1e-4` and seed is `2024`. Retrieval trains all encoder blocks with `--nr_of_last_encoder_blocks_to_finetune -1`.
+FedCLIP adds:
 
-Override paths with `--torch_data_dir`, `--model_weights_dir`, `--pre_processors_cache_dir` and `--tokenizer_weights_cache_dir`. All modules expose `--help`.
-
-Action audio supports `--audio_time_dimension 1s` or `10.24s`. MELD's default compatibility key `3.88s` selects a 2.56-second clip padded to 766 filterbank frames.
+```bash
+--use_adapter_approach True \
+--include_image_adapter True \
+--include_text_adapter True
+```
 
 </details>
-
-**[Published results →](https://nousphera.github.io/MPSL/#findings)**
 
 ## Citation
 
