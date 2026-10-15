@@ -101,8 +101,8 @@ def get_federated_model(use_pre_layer_norm, use_post_layer_norm, use_large_encod
 
 class CentralizedModel(MetaTransformerBase):
 
-    def __init__(self, use_pre_layer_norm, use_post_layer_norm, use_large_encoder, freeze_encoder, nr_of_encoder_blocks_to_finetune, trainable_params_key, use_clip_encoder_for_text_embeddings, device):
-        super().__init__(num_classes=-1, trainable_params=get_trainable_params_keys('classifier_and_image_tokenizer', trainable_params_key), use_pre_layer_norm=use_pre_layer_norm, use_post_layer_norm=use_post_layer_norm, use_large_encoder=use_large_encoder, freeze_encoder=freeze_encoder, nr_of_encoder_blocks_to_finetune=nr_of_encoder_blocks_to_finetune)
+    def __init__(self, use_pre_layer_norm, use_post_layer_norm, use_large_encoder, freeze_encoder, nr_of_encoder_blocks_to_finetune, trainable_params_key, use_clip_encoder_for_text_embeddings, device, pretrained=True, encoder_name=None):
+        super().__init__(num_classes=-1, trainable_params=get_trainable_params_keys('classifier_and_image_tokenizer', trainable_params_key), use_pre_layer_norm=use_pre_layer_norm, use_post_layer_norm=use_post_layer_norm, use_large_encoder=use_large_encoder, freeze_encoder=freeze_encoder, nr_of_encoder_blocks_to_finetune=nr_of_encoder_blocks_to_finetune, pretrained=pretrained, encoder_name=encoder_name)
 
         self.device = device
 
@@ -113,9 +113,10 @@ class CentralizedModel(MetaTransformerBase):
                                         embed_dim=self.embed_dim, bias=False, use_cls_embedding=True)
         self.text_tokenizer = Data2Seq(modality=InputModality.TEXT, embed_dim=self.embed_dim,
                                        use_clip_encoder_for_text_embeddings=use_clip_encoder_for_text_embeddings,
-                                       use_large_encoder=use_large_encoder, device=device)
+                                       use_large_encoder=use_large_encoder, device=device, pretrained=self.pretrained)
 
-        self.pre_load_tokenizers_and_norm_layer_weights()
+        if pretrained:
+            self.pre_load_tokenizers_and_norm_layer_weights()
         self.apply_pre_loaded_weights()
 
     def pre_load_tokenizers_and_norm_layer_weights(self):

@@ -1,8 +1,6 @@
 import os
 
-import open_clip
 import torch
-from transformers import AutoModelForAudioClassification, AutoModelForImageClassification
 
 supported_image_tokenizer_checkpoints = {
     'ViT-Ti/16': {
@@ -33,6 +31,8 @@ supported_audio_tokenizer_checkpoints = {
 
 
 def get_image_tokenizer_weights(base_encoder_name):
+    import open_clip
+    from transformers import AutoModelForImageClassification
     checkpoint_data = supported_image_tokenizer_checkpoints[base_encoder_name]
 
     if base_encoder_name not in supported_image_tokenizer_checkpoints.keys():
@@ -61,6 +61,7 @@ def get_image_tokenizer_weights(base_encoder_name):
 
 
 def get_audio_tokenizer_weights(model_key, model_name):
+    from transformers import AutoModelForAudioClassification
     if model_key not in supported_audio_tokenizer_checkpoints:
         raise NotImplementedError(f"Pre-trained audio tokenizer weights for {model_name} is not implemented.")
 
@@ -68,6 +69,8 @@ def get_audio_tokenizer_weights(model_key, model_name):
 
 
 def get_encoder_weights(target_model_state_dict, use_large_encoder=False, include_classifier=True):
+    import open_clip
+    from transformers import AutoModelForImageClassification
     from mpsl.models.meta_transformer.base.meta_transformer import vit_base_encoder_options
     should_override_base_encoder_setting = 'VIT_BASE' in os.environ and os.environ['VIT_BASE'] != 'None'
 

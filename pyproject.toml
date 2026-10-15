@@ -8,11 +8,11 @@ version = "0.1.0"
 description = "Multimodal parallel split learning with a shared transformer encoder"
 readme = "README.md"
 requires-python = ">=3.11,<3.13"
-dependencies = ["torch==2.14.1", "torchvision==0.29.1", "numpy>=2,<3", "tqdm>=4.67,<5"]
+dependencies = ["torch==2.14.1", "torchvision==0.29.1", "numpy>=2,<3", "tqdm>=4.67,<5", "timm==1.0.30", "einops>=0.8,<1"]
 
 [project.optional-dependencies]
 test = ["pytest>=8,<10"]
-experiments = ["torchaudio==2.11.0", "scikit-learn>=1.5,<2", "transformers==5.19.0", "einops>=0.8,<1", "timm==1.0.30", "open_clip_torch==3.3.0", "pillow>=12.3,<13", "av>=15,<16", "fvcore==0.1.5.post20221221"]
+experiments = ["torchaudio==2.11.0", "scikit-learn>=1.5,<2", "transformers==5.19.0", "open_clip_torch==3.3.0", "pillow>=12.3,<13", "av>=15,<16", "fvcore==0.1.5.post20221221"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

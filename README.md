@@ -4,7 +4,7 @@
 
 Timo Fudala · Vasileios Tsouvalas · Nirvana Meratnia
 
-[<img src="docs/assets/icons/paper.svg" width="16" height="16" alt=""> Paper](https://arxiv.org/abs/2502.06355) · [<img src="docs/assets/icons/project.svg" width="16" height="16" alt=""> Project](https://nousphera.github.io/MPSL/) · [Datasets](DATASETS.md) · [Experiments](docs/experiments.md) · [Method](docs/REPRODUCIBILITY.md)
+[<img src="docs/assets/icons/paper.svg" width="16" height="16" alt=""> Paper](https://arxiv.org/abs/2502.06355) · [<img src="docs/assets/icons/project.svg" width="16" height="16" alt=""> Project](https://nousphera.github.io/MPSL/) · [Datasets](DATASETS.md) · [Experiments](docs/experiments.md) · [Method](#method-and-communication)
 
 ## Abstract
 
@@ -20,7 +20,7 @@ for the method and reported experiments.
 
 **Implementation:** a single-process simulator with explicit client/server
 tensor exchanges, early and late fusion, and classification and retrieval
-trainers. The [protocol guide](docs/REPRODUCIBILITY.md#explicit-gradient-exchange)
+trainers. The [method section](#method-and-communication)
 describes gradient exchange, communication accounting and privacy properties.
 
 <p align="center">
@@ -57,7 +57,7 @@ For CUDA, create a separate environment, install compatible wheels from the
 [PyTorch installer](https://pytorch.org/get-started/locally/), then run
 `python -m pip install -e '.[experiments,test]'`. Select matching PyTorch, torchvision and torchaudio wheel variants.
 
-For a smaller trainer-only environment, use
+For an offline paper-model environment, use
 `SETUP_PROFILE=smoke bash scripts/setup.sh`. Optional media/model integration tests
 will be skipped when those dependencies are absent. The
 [resolved macOS Python 3.11 environment](requirements-tested-macos-py311.txt)
@@ -89,8 +89,13 @@ First exercise both fusion paths without datasets or checkpoints:
 python -m mpsl.smoke --output runs/smoke
 ```
 
-This trains two clients with two synthetic modalities through the real
-classification split trainer. Use a new output directory for another run.
+This runs the paper’s full Meta-Transformer ViT-B/16 (12 blocks, width 768,
+12 attention heads) with the UCF101 audio-subset classifier and real image/AST
+patch tokenizers. Images are 224×224; audio uses the supported one-second
+window. It explicitly initializes weights from scratch and uses three synthetic
+samples across two clients, with one epoch per fusion path. It checks execution,
+not pretrained accuracy, and requires memory for the full model. Use a new output
+directory for another run.
 
 For research training, obtain the **Meta-Transformer base encoder** from its
 [model zoo](https://github.com/invictus717/MetaTransformer#-model-zoo) and save it as
@@ -135,7 +140,7 @@ python -m json.tool checkpoints/cocoqa-mpsl.json
 ```
 
 Use the same source manifest, label map and client partitions across comparisons.
-The [protocol guide](docs/REPRODUCIBILITY.md) defines the prediction-gradient
+The [method section](#method-and-communication) defines the prediction-gradient
 exchange and exactly which tensor bytes enter communication counts.
 
 ## Outputs and configuration
@@ -150,8 +155,47 @@ Tests cover source-format preparation for all seven datasets, unchanged raw file
 actual classification/retrieval split-training updates, deterministic media
 evaluation, gradient equivalence across serialized tensor boundaries, partition
 coverage and checkpoint round trips. Tensor byte counts include prediction-gradient uploads and exclude serialization
-and network framing. See the [protocol guide](docs/REPRODUCIBILITY.md) for the
+and network framing. See the [method section](#method-and-communication) for the
 message sequence and [dataset guide](DATASETS.md) for label maps and audio shapes.
+
+## Method and communication
+
+Each client keeps its tokenizer graph and sends detached cut activations. The
+shared encoder returns detached predictions. Client losses remain local: each
+client sends `(n_client / n_batch) × dLoss/dPrediction` plus scalar loss telemetry.
+The server performs one backward pass and returns cut gradients to trainable
+client tokenizers. Retrieval retains client-local negatives and sums caption
+losses with the same sample weighting, including incomplete batches.
+
+Communication counts include cut activations, predictions, prediction gradients,
+scalar losses and cut gradients as logical tensor elements × dtype size. They
+exclude serialization headers, control messages and network framing. Paper §3.2
+writes a scalar client-loss upload; a detached boundary also needs its prediction
+gradient. These additional uploads are included here, so these byte totals have a
+different scope from scalar-only paper figures. Labels stay in client loss
+calculations, but prediction gradients can reveal them: label locality is not a
+privacy guarantee. Network deployment needs separate transport and privacy work.
+
+Classification evaluation uses deterministic media transforms and example-weighted
+metrics. Retrieval preserves image/caption groups and evaluates both directions.
+COCO-QA answer labels use frequency ordering with alphabetical ties; MELD retains
+its numeric emotion map. Check checkpoint label order before reuse. Action audio
+windows align with video frames; MELD’s `3.88s` compatibility option means a
+2.56-second clip padded to 766 filterbank frames. See [DATASETS.md](DATASETS.md).
+
+The default research backbone is pretrained Meta-Transformer ViT-B/16; the last
+six encoder blocks train for classification and all twelve for retrieval. The
+published size ablations retain their official ViT-Ti/16, ViT-S/16, ViT-L/14 and
+ViT-H/14 architectures. ViT-Ti is a published ablation, not a reduced substitute
+for the default. Text uses OpenCLIP’s CLIP tokenizer/encoder; AST provides audio
+patch embeddings. Pretrained loading errors propagate. The explicit
+`pretrained=False` Python constructor option initializes the same architecture
+from scratch for offline validation; it is not an automatic fallback.
+
+Retain source manifests, checkpoint hashes, seed, effective command and dependency
+freeze with each research run. Tests cover serialized gradient equivalence,
+client weighting and exhaustion, full paper-model fusion paths, prepared dataset
+loaders, media decoding, partitions and checkpoint round trips.
 
 ## Results
 
@@ -187,5 +231,6 @@ COCO-QA and Kinetics-Sounds columns show the accompanying accuracy trade-offs.
 
 ## License
 
-[MIT](LICENSE). Dataset, pretrained model and third-party code terms apply
+[MIT](LICENSE), with original authorship and history retained. Dataset,
+pretrained model and third-party code terms apply
 separately; those resources are not redistributed by this repository.

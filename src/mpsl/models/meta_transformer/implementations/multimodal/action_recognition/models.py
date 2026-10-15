@@ -145,8 +145,10 @@ class CentralizedModel(MetaTransformerBase):
             device,
             fusion_type,
             audio_time_dimension,
-            num_classes):
-        super().__init__(num_classes=num_classes, trainable_params=get_trainable_params_keys('classifier_and_image_tokenizer_and_audio_tokenizer', trainable_params_key), use_pre_layer_norm=use_pre_layer_norm, use_post_layer_norm=use_post_layer_norm, use_large_encoder=use_large_encoder, freeze_encoder=freeze_encoder, nr_of_encoder_blocks_to_finetune=nr_of_encoder_blocks_to_finetune)
+            num_classes,
+            pretrained=True,
+            encoder_name=None):
+        super().__init__(num_classes=num_classes, trainable_params=get_trainable_params_keys('classifier_and_image_tokenizer_and_audio_tokenizer', trainable_params_key), use_pre_layer_norm=use_pre_layer_norm, use_post_layer_norm=use_post_layer_norm, use_large_encoder=use_large_encoder, freeze_encoder=freeze_encoder, nr_of_encoder_blocks_to_finetune=nr_of_encoder_blocks_to_finetune, pretrained=pretrained, encoder_name=encoder_name)
 
         self.device = device
 
@@ -166,7 +168,8 @@ class CentralizedModel(MetaTransformerBase):
 
         self.setup_tokenizers_for_fusion()
 
-        self.pre_load_tokenizers_and_norm_layer_weights()
+        if pretrained:
+            self.pre_load_tokenizers_and_norm_layer_weights()
         self.apply_pre_loaded_weights()
 
     def pre_load_tokenizers_and_norm_layer_weights(self):
@@ -262,17 +265,18 @@ class CentralizedModel(MetaTransformerBase):
 
 class ClientModel(nn.Module):
 
-    def __init__(self, device):
+    def __init__(self, device, base_model=None):
         super().__init__()
+        base_model = centralized_base_model if base_model is None else base_model
 
         self.device = device
-        self.embed_dim = centralized_base_model.embed_dim
-        self.fusion_type = centralized_base_model.fusion_type
+        self.embed_dim = base_model.embed_dim
+        self.fusion_type = base_model.fusion_type
 
-        self.image_tokenizer = copy.deepcopy(centralized_base_model.image_tokenizer)
-        self.audio_tokenizer = copy.deepcopy(centralized_base_model.audio_tokenizer)
+        self.image_tokenizer = copy.deepcopy(base_model.image_tokenizer)
+        self.audio_tokenizer = copy.deepcopy(base_model.audio_tokenizer)
 
-        self.pre_layer_norm = copy.deepcopy(centralized_base_model.pre_layer_norm)
+        self.pre_layer_norm = copy.deepcopy(base_model.pre_layer_norm)
 
     def switch_to_device(self, device):
         self.to(device)
@@ -288,7 +292,7 @@ class ClientModel(nn.Module):
         audio = audio.to(self.device)
         audio = self.audio_tokenizer(audio)
 
-        match centralized_base_model.fusion_type:
+        match self.fusion_type:
             case FusionType.EARLY_WITH_BOTH_CLS_AND_POOLING_MEAN:
                 fused_embeddings = torch.cat((image, audio), dim=1)
 
@@ -302,16 +306,19 @@ class ClientModel(nn.Module):
 
 class ServerModel(nn.Module):
 
-    def __init__(self):
+    def __init__(self, base_model=None):
         super().__init__()
+        base_model = centralized_base_model if base_model is None else base_model
 
         # Note that for the ServerModel, we do not need to copy from the centralized model instance, as there only will be a single ServerModel instance.
-        self.embed_dim = centralized_base_model.embed_dim
+        self.embed_dim = base_model.embed_dim
+        self.fusion_type = base_model.fusion_type
+        self.nr_of_visual_patches = base_model.nr_of_visual_patches
 
-        self.encoder = centralized_base_model.encoder
-        self.to_latent = centralized_base_model.to_latent
-        self.post_layer_norm = centralized_base_model.post_layer_norm
-        self.classifier = centralized_base_model.classifier
+        self.encoder = base_model.encoder
+        self.to_latent = base_model.to_latent
+        self.post_layer_norm = base_model.post_layer_norm
+        self.classifier = base_model.classifier
 
     def switch_to_device(self, device):
         self.to(device)
@@ -329,7 +336,7 @@ class ServerModel(nn.Module):
     def forward_with_fusion(self, x):
         batch_len = -1
 
-        match centralized_base_model.fusion_type:
+        match self.fusion_type:
             case FusionType.EARLY_WITH_BOTH_CLS_AND_POOLING_MEAN:
                 batch_len = x.size(0)
             case FusionType.LATE_WITH_BOTH_CLS_AND_POOLING_MEAN:
@@ -337,13 +344,13 @@ class ServerModel(nn.Module):
 
                 batch_len = len(audio)
 
-        match centralized_base_model.fusion_type:
+        match self.fusion_type:
             case FusionType.EARLY_WITH_BOTH_CLS_AND_POOLING_MEAN:
                 x = self.encoder(x)
 
                 image_cls_patch_embedding = self.to_latent(x[:, 0, :]).reshape(batch_len, 1, self.embed_dim)
                 # Since we prepend the CLS patch for each modality, the CLS patch for audio immediately follows after the last visual patch.
-                audio_cls_patch_embedding = self.to_latent(x[:, centralized_base_model.nr_of_visual_patches, :]).reshape(batch_len, 1, self.embed_dim)
+                audio_cls_patch_embedding = self.to_latent(x[:, self.nr_of_visual_patches, :]).reshape(batch_len, 1, self.embed_dim)
 
                 x = torch.cat((image_cls_patch_embedding, audio_cls_patch_embedding), dim=1)
                 kernel_size = x.size(1)

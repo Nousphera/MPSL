@@ -238,6 +238,8 @@ def test_prepared_classification_batch_updates_real_split_trainer(
     from mpsl.available_datasets.preparation import prepare_dataset
     from mpsl.trainers.implementations.classification.mpsl_trainer import MPSLTrainer
 
+    pytest.importorskip("open_clip")
+    from torchvision.transforms import Compose, Resize
     source, samples = source_fixture(tmp_path, name)
     prepare_dataset(name, tmp_path / "prepared", source, samples_file=samples)
     monkeypatch.setenv("TORCH_DATA_DIR", str(tmp_path / "prepared"))
@@ -245,38 +247,30 @@ def test_prepared_classification_batch_updates_real_split_trainer(
         name,
         num_partitions=1,
         min_num_samples=1,
-        transform=ToTensor(),
+        transform=Compose([Resize((224, 224)), ToTensor()]),
         global_args=SimpleNamespace(audio_time_dimension="1s"),
     )
 
-    class Client(torch.nn.Module):
-        def __init__(self):
-            super().__init__()
-            self.layer = torch.nn.Linear(4, 8)
-
-        def forward(self, x):
-            count = len(next(iter(x.values())))
-            columns = []
-            for key in (InputModality.IMAGE, InputModality.AUDIO):
-                value = x.get(key)
-                columns.append(
-                    value.reshape(count, -1).mean(1)
-                    if value is not None
-                    else torch.zeros(count)
-                )
-            columns.extend(
-                [
-                    torch.tensor(
-                        [len(v) / 100 for v in x.get(InputModality.TEXT, [""] * count)]
-                    ),
-                    torch.ones(count),
-                ]
-            )
-            return self.layer(torch.stack(columns, dim=1))
-
-    client, server = Client(), torch.nn.Linear(8, dataset.num_classes)
-    before = server.weight.detach().clone()
-    result = MPSLTrainer("early", [])._early_fusion_epoch(
+    import importlib
+    task = ('action_recognition' if name in {'ucf101', 'kinetics-sounds'}
+            else 'emotion_recognition' if name == 'meld' else 'vqa')
+    module = importlib.import_module(f'mpsl.models.meta_transformer.implementations.multimodal.{task}.models')
+    options = dict(use_pre_layer_norm=False, use_post_layer_norm=False,
+                   use_large_encoder=False, freeze_encoder=False,
+                   nr_of_encoder_blocks_to_finetune=6, trainable_params_key='default',
+                   device='cpu', fusion_type='default', num_classes=dataset.num_classes,
+                   pretrained=False, encoder_name='ViT-B/16')
+    if task != 'action_recognition':
+        options['use_clip_encoder_for_text_embeddings'] = True
+    if task != 'vqa':
+        options['audio_time_dimension'] = '1s'
+    base = module.CentralizedModel(**options)
+    monkeypatch.setattr(module, 'centralized_base_model', base)
+    client, server = module.ClientModel('cpu'), module.ServerModel()
+    before = server.classifier.weight.detach().clone()
+    trainer = MPSLTrainer("late" if task == "action_recognition" else "early", [InputModality.IMAGE, InputModality.AUDIO])
+    train_epoch = trainer._late_fusion_epoch if task == 'action_recognition' else trainer._early_fusion_epoch
+    result = train_epoch(
         torch.device("cpu"),
         server,
         torch.optim.SGD(server.parameters(), lr=0.01),
@@ -287,7 +281,7 @@ def test_prepared_classification_batch_updates_real_split_trainer(
         1,
         SimpleNamespace(nr_of_clients=1),
     )
-    assert not torch.equal(before, server.weight)
+    assert not torch.equal(before, server.classifier.weight)
     assert all(torch.isfinite(p).all() for p in server.parameters())
 
 
@@ -299,6 +293,8 @@ def test_prepared_retrieval_batch_trains_and_evaluates(tmp_path, monkeypatch, na
     )
     from mpsl.trainers.implementations.experiment_results import ExperimentResults
 
+    pytest.importorskip("open_clip")
+    from torchvision.transforms import Compose, Resize
     source, _ = source_fixture(tmp_path, name)
     annotation = next((source / "karpathy").glob("*.json"))
     rows = json.loads(annotation.read_text())
@@ -322,37 +318,19 @@ def test_prepared_retrieval_batch_trains_and_evaluates(tmp_path, monkeypatch, na
         name,
         num_partitions=1,
         min_num_samples=1,
-        transform=ToTensor(),
+        transform=Compose([Resize((224, 224)), ToTensor()]),
         global_args=SimpleNamespace(),
     )
 
-    class Encoder(torch.nn.Module):
-        def __init__(self, client=False):
-            super().__init__()
-            self.client = client
-            self.image = torch.nn.Linear(3, 3)
-            self.text = torch.nn.Linear(3, 3)
-
-        def forward(self, x):
-            im, txt = x[InputModality.IMAGE], x[InputModality.TEXT]
-            if self.client:
-                im = im.mean((2, 3))
-                txt = torch.tensor(
-                    [
-                        [
-                            [len(s) / 100, sum(map(ord, s)) / 1000, int(s[-1]) / 5]
-                            for s in captions
-                        ]
-                        for captions in txt
-                    ]
-                )
-            return {
-                InputModality.IMAGE: self.image(im),
-                InputModality.TEXT: self.text(txt),
-            }
-
-    client, server = Encoder(True), Encoder()
-    initial = server.image.weight.detach().clone()
+    from mpsl.models.meta_transformer.implementations.multimodal.image_text_retrieval import models
+    base = models.CentralizedModel(
+        use_pre_layer_norm=False, use_post_layer_norm=False, use_large_encoder=False,
+        freeze_encoder=False, nr_of_encoder_blocks_to_finetune=12,
+        trainable_params_key='default', use_clip_encoder_for_text_embeddings=True,
+        device='cpu', pretrained=False, encoder_name='ViT-B/16')
+    monkeypatch.setattr(models, 'centralized_base_model', base)
+    client, server = models.ClientModel('cpu'), models.ServerModel()
+    initial = server.encoder[0].attn.qkv.weight.detach().clone()
     trainer, results = MPSLTrainer(5, 1, 2), ExperimentResults()
     optimizer = torch.optim.SGD(client.parameters(), lr=0.01)
     trainer._train_epoch(
@@ -374,7 +352,7 @@ def test_prepared_retrieval_batch_trains_and_evaluates(tmp_path, monkeypatch, na
         1,
         SimpleNamespace(nr_of_clients=1),
     )
-    assert not torch.equal(initial, server.image.weight)
+    assert not torch.equal(initial, server.encoder[0].attn.qkv.weight)
     trainer._test_epoch(
         torch.device("cpu"),
         results,

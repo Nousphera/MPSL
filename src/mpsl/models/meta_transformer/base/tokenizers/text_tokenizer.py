@@ -11,6 +11,7 @@ class TextTokenizer(nn.Module):
     def __init__(self, embed_dim, **kwargs):
         super().__init__()
         self.embed_dim = embed_dim
+        self.pretrained = kwargs.get("pretrained", True)
         self.desired_target_device = torch.device(kwargs["device"])
         self.use_clip_encoder_for_text_embeddings = kwargs[
             "use_clip_encoder_for_text_embeddings"
@@ -26,11 +27,11 @@ class TextTokenizer(nn.Module):
         tokens = open_clip.tokenize(text).to(self.desired_target_device)
         if self.use_clip_encoder_for_text_embeddings:
             name = "ViT-B-16" if self.embed_dim <= 768 else "ViT-L-14"
-            key = (name, str(self.desired_target_device))
+            key = (name, str(self.desired_target_device), self.pretrained)
             if key not in _ENCODERS:
                 encoder, _, _ = open_clip.create_model_and_transforms(
                     name,
-                    pretrained="openai",
+                    pretrained="openai" if self.pretrained else None,
                     device=self.desired_target_device,
                     force_quick_gelu=True,
                 )

@@ -69,7 +69,9 @@ class MetaTransformerBase(nn.Module):
             freeze_encoder=True,
             nr_of_encoder_blocks_to_finetune=-1,
             use_pre_layer_norm=False,
-            use_post_layer_norm=False):
+            use_post_layer_norm=False,
+            pretrained=True,
+            encoder_name=None):
         """
         Uses both common CLS token and learned position embedding approaches. Position embeddings are used to encode the relative position of a patch, whereas
         the CLS token is used as an aggregated representation of all patches.
@@ -87,7 +89,10 @@ class MetaTransformerBase(nn.Module):
         # While Meta-Transformer originally supports ViT-B/16 and ViT-L/14 as its base and large encoder backbone, respectively, we include the possibility for using different ViT encoder backbones.
         # This should explicitly be enabled by using global env variables.
         should_override_base_encoder_setting = 'VIT_BASE' in os.environ and os.environ['VIT_BASE'] != 'None'
-        if should_override_base_encoder_setting:
+        if encoder_name is not None:
+            self.base_encoder_name = encoder_name
+            use_large_encoder = encoder_name == "ViT-L/14"
+        elif should_override_base_encoder_setting:
             self.base_encoder_name = os.environ['VIT_BASE']
 
             # We need to override the use_large_encoder parameter to ensure that it will be set accordingly, as it might be used in other places.
@@ -131,15 +136,18 @@ class MetaTransformerBase(nn.Module):
         if num_classes > 0:
             self.classifier = nn.Linear(self.embed_dim, num_classes)
 
-        self._pre_loaded_model_weights = None
-        self.pre_load_encoder_weights(use_large_encoder=use_large_encoder)
+        self.pretrained = pretrained
+        self._pre_loaded_model_weights = {}
+        if pretrained:
+            self.pre_load_encoder_weights(use_large_encoder=use_large_encoder)
 
     def pre_load_encoder_weights(self, use_large_encoder):
         self._pre_loaded_model_weights = get_encoder_weights(self.state_dict(), use_large_encoder=use_large_encoder, include_classifier=self.num_classes > 0)
 
     def apply_pre_loaded_weights(self):
-        load_result = self.load_state_dict(self._pre_loaded_model_weights, strict=False)
-        print(f'Applying model weights result: {load_result}')
+        if self.pretrained:
+            load_result = self.load_state_dict(self._pre_loaded_model_weights, strict=False)
+            print(f'Applying model weights result: {load_result}')
 
         # We no longer require the weights, so we can free the used memory.
         self._pre_loaded_model_weights = None

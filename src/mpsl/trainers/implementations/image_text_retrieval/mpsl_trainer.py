@@ -176,7 +176,9 @@ class MPSLTrainer(ExperimentTrainer):
                             (client_begin_index, client_end_index) = mini_batch_indices[client_id]
                             cut_layer_grads = self.transfer(final_activations.grad[client_begin_index:client_end_index])
 
-                            intermediate_client_activations[client_id].backward(cut_layer_grads)
+                            # CLIP text features are frozen even when the image tokenizer trains.
+                            if intermediate_client_activations[client_id].requires_grad:
+                                intermediate_client_activations[client_id].backward(cut_layer_grads)
 
                             if is_last_modality:
                                 client_optimizers[client_id].step()

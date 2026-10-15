@@ -77,7 +77,7 @@ def media_fixture(path):
 def test_actual_video_and_audio_decoding(tmp_path):
     from mpsl.available_datasets.utils.media import read_audio, read_video_audio
 
-    path = tmp_path / "tiny.mkv"
+    path = tmp_path / "media.mkv"
     expected = media_fixture(path)
     frames, waveform, info = read_video_audio(path)
     assert frames.shape == (8, 3, 16, 16)
@@ -106,21 +106,14 @@ def test_frozen_openai_encoder_activation_padding_and_cache(monkeypatch):
 
     calls = []
 
-    class Encoder(torch.nn.Module):
-        def __init__(self, width):
-            super().__init__()
-            self.weight = torch.nn.Parameter(torch.ones(width))
-
-        def encode_text(self, tokens, normalize):
-            assert not self.training
-            assert not self.weight.requires_grad
-            assert not torch.is_grad_enabled()
-            assert normalize is False
-            return self.weight.expand(len(tokens), -1)
-
+    created = []
     def create(name, **kwargs):
         calls.append((name, kwargs))
-        return Encoder(512 if name == "ViT-B-16" else 768), None, None
+        # Exercise the complete OpenAI CLIP text architecture without checkpoints.
+        model = open_clip.create_model(name, pretrained=None, force_quick_gelu=True)
+        model.visual = None  # Unused vision branch is not part of the text tokenizer.
+        created.append(model)
+        return model, None, None
 
     monkeypatch.setattr(module, "_ENCODERS", {})
     monkeypatch.setattr(open_clip, "create_model_and_transforms", create)
@@ -132,7 +125,12 @@ def test_frozen_openai_encoder_activation_padding_and_cache(monkeypatch):
 
     small = tokenizer(768)
     first = small(["a dog"])
-    torch.testing.assert_close(first[:, :512], torch.ones(1, 512))
+    with torch.no_grad():
+        expected = created[0].encode_text(open_clip.tokenize(["a dog"]), normalize=False)
+    torch.testing.assert_close(first[:, :512], expected)
+    assert len(created[0].transformer.resblocks) == 12
+    assert all(not p.requires_grad for p in created[0].parameters())
+    assert not created[0].training
     assert first[:, 512:].count_nonzero() == 0
     assert first.requires_grad is False
     assert not small.state_dict()
