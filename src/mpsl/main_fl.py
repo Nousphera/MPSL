@@ -130,7 +130,7 @@ if __name__ == '__main__':
         client_schedulers[client_id] = client_scheduler
 
     # A utility object that can be used to streamline archiving experiment results.
-    experiment_results = ExperimentResults()
+    experiment_results = ExperimentResults(global_args)
 
     # # # # # # # # # # # # # # # # # Training # # # # # # # # # # # # # # # # #
     for epoch_nr in range(global_args.nr_of_epochs):

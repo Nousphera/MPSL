@@ -2,7 +2,19 @@ from typing import List
 
 
 class ExperimentResults:
-    def __init__(self):
+    def __init__(self, arguments=None):
+        self.configuration = dict(vars(arguments)) if arguments is not None else None
+        self.dataset_provenance = None
+        if arguments is not None and arguments.dataset != 'cifar100':
+            from pathlib import Path
+            from mpsl.available_datasets.preparation import load_manifest, sha256
+            manifest = load_manifest(arguments.torch_data_dir, arguments.dataset)
+            path = Path(arguments.torch_data_dir) / arguments.dataset / 'manifest.json'
+            self.dataset_provenance = {
+                'manifest': str(path.resolve()), 'sha256': sha256(path),
+                'counts': manifest['counts'], 'class_to_idx': manifest['class_to_idx'],
+                'custom_samples': manifest['custom_samples'],
+            }
         self.epochs = []
         self.train_metric = []
         self.test_metric = []
@@ -31,6 +43,8 @@ class ExperimentResults:
 
     def to_json(self):
         return {
+            "configuration": self.configuration,
+            "dataset": self.dataset_provenance,
             "epochs": self.epochs,
             "train_metric": self.train_metric,
             "test_metric": self.test_metric,

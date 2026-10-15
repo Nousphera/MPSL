@@ -102,8 +102,7 @@ def load_transform(modality='video', train=True, **kwargs):
     if modality == 'audio':
         return torchvision.transforms.Compose([
             torchaudio.transforms.Resample(orig_freq=kwargs.get('sample_rate', 16000), new_freq=16000),
-            torchvision.transforms.RandomCrop(size=(1, kwargs.get('duration', math.floor(10.24 * 16000))),
-                                              pad_if_needed=True),
+            (torchvision.transforms.RandomCrop(size=(1, kwargs.get('duration', math.floor(10.24 * 16000))), pad_if_needed=True) if train else torchvision.transforms.CenterCrop(size=(1, kwargs.get('duration', math.floor(10.24 * 16000))))),
             torchvision.transforms.Lambda(lambda x: x - x.mean()),
             torchvision.transforms.Lambda(lambda x: torchaudio.compliance.kaldi.fbank(x,
                                                                                       htk_compat=True,
@@ -203,6 +202,8 @@ class VideoAudioDataset(torch.utils.data.Dataset):
         return len(self.video_files)
 
     def _get_clip_pts(self, video, audio, info):
+        if video.shape[0] == 0 or any(not math.isfinite(info[k]) or info[k] <= 0 for k in ('video_fps', 'audio_fps')):
+            raise ValueError('Media must have frames and positive finite stream rates')
         start, end = self._clip_sampler(video.shape[0] / info[
             'video_fps'])  # if video.shape[0]/info['video_fps']>self.video_duration(info['video_fps']) else (0.0, video.shape[0]/info['video_fps'])
         video_start = max(0, math.floor(start * info['video_fps']))

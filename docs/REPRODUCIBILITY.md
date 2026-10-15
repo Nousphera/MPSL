@@ -49,3 +49,31 @@ Save the complete command, dataset version/split, checkpoint hash, seed and depe
 Validated locally: all 77 package modules import with experiment dependencies; generated video/audio decode and Kaldi filterbanks execute; original CLIP token IDs and truncation match; package installation, regression tests, offline early/late fusion training and deterministic repeat, classification/retrieval update equivalence with detached and serialized exchanges, exact tensor payload accounting, checkpoint round trips, and dataset partition coverage. Full benchmark accuracy, multi-seed confidence intervals, H100 runtime, real network communication and formal privacy are not re-established by these checks.
 
 The historical centralized/federated/retrieval experiment variants are retained. Their full dataset trajectories have not been rerun. Do not combine older paper numbers with new implementation timings as if they were measured together.
+
+## Dataset preparation follow-up
+
+All seven multimodal datasets now use a manifest produced by
+`scripts/prepare_data.py`, with read-only references to acquired source files.
+COCO images retain original names; retrieval follows Karpathy filepaths; Flickr
+uses filenames instead of assuming image IDs equal an external dataset row index.
+T4SA uses exact string IDs and per-preparation text, with no pickle/global cache.
+UCF, Kinetics and MELD retain shipped sample selections and fixed global label maps;
+all required media is checked. Constructor-side downloads, unsafe shell commands,
+archive extraction, raw-data moves and cleanup were removed. The old Kinetics
+last-file completeness test and UCF always-truthy path check are gone.
+
+Evaluation uses deterministic video frames/crops and audio padding. Model heads
+and retrieval evaluation sizes follow the prepared manifest, and research result
+JSON records its hash and configuration. COCO-QA's closed answer vocabulary covers
+both splits, with explicit alphabetical tie ordering. This may change label IDs
+relative to old NumPy sorting; old checkpoints require label-map verification.
+MELD's 2.56-second clip and 766-frame padded frontend are preserved explicitly,
+including the historical misnomer `3.88s`. These corrections and the source-format
+contracts are documented in [DATASETS.md](../DATASETS.md).
+
+Generated image/text/audio/video fixtures pass through every importer and its
+public dataset loader, then real classification and retrieval split trainers.
+These checks use small trainable test models, not downloaded Meta-Transformer
+weights. Full corpus acquisition and the published benchmark trajectories remain
+unverified. Provider access is external; no restricted images, tweets or videos
+are distributed.

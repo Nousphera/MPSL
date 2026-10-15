@@ -1,51 +1,95 @@
 # MPSL
 
-**Fine-tuning Multimodal Transformers on Edge: A Parallel Split Learning Approach**
+**Fine-Tuning Multimodal Transformers on Edge: A Parallel Split Learning Approach**
 
-[Paper](https://arxiv.org/abs/2502.06355) · [Project](https://nousphera.github.io/MPSL/) · [Experiment guide](docs/experiments.md) · [Reproducibility](docs/REPRODUCIBILITY.md)
+[Paper](https://arxiv.org/abs/2502.06355) · [Project](https://nousphera.github.io/MPSL/) · [Datasets](DATASETS.md) · [Experiments](docs/experiments.md) · [Reproducibility](docs/REPRODUCIBILITY.md)
 
-Lightweight client tokenizers and a shared server encoder support **image–text, audio–text and audio–video learning**. Clients compute their losses on detached predictions and return sample-weighted prediction gradients; the server performs one backward pass. The repository includes MPSL, centralized and federated baselines, and early/late fusion implementations.
+## Abstract
 
-This is a maintained revision of the authors' research code. The implementation is a **single-process research simulator** with explicit detached tensor exchanges. It does not implement a private distributed transport or establish a privacy guarantee. Unlike the original scalar-loss simulation, it counts the prediction gradients needed for server backpropagation. Those gradients can reveal labels; see the [method and communication correction](docs/REPRODUCIBILITY.md#explicit-gradient-exchange).
+Multimodal transformers are expensive to fine-tune on resource-constrained edge
+devices. MPSL distributes this work between lightweight client tokenizers and a
+shared server encoder. Clients tokenize images, audio and text, while the server
+processes their representations and supports early or late modality fusion.
+Client objectives are combined into a sample-weighted update with one server
+backward pass. The framework supports visual question answering, sentiment and
+emotion recognition, action recognition, and image–text retrieval, with
+centralized and federated baselines. See the [paper](https://arxiv.org/abs/2502.06355)
+for the method and reported experiments.
 
-## Start with a CPU check
+This maintained implementation is a single-process research simulator with
+explicit detached tensor exchanges. Correct server backpropagation requires
+prediction-gradient uploads; these are included in its communication counters
+and can reveal labels. It does not provide a privacy guarantee or reproduce the
+paper's scalar-only communication accounting. The [method correction](docs/REPRODUCIBILITY.md#explicit-gradient-exchange)
+explains the distinction.
 
-Python 3.11–3.12. No datasets, checkpoints or GPU are needed for this check.
+## Setup
+
+Use **Python 3.11 or 3.12** on macOS or Linux. The maintained CPU environment uses
+PyTorch 2.14.1, torchvision 0.29.1, torchaudio 2.11.0, Transformers 5.19 and
+OpenCLIP 3.3. Install Python's `venv` support (`python3.11-venv` on distributions
+that package it separately). Media decoding uses PyAV wheels; no system FFmpeg
+command is required on the tested macOS wheel installation.
 
 ```bash
-python3.11 -m venv .venv
+git clone https://github.com/Nousphera/MPSL.git
+cd MPSL
+bash scripts/setup.sh
 source .venv/bin/activate
-python -m pip install -e '.[test]'
 python -m pytest
+```
+
+The setup script creates an isolated environment and installs all experiment and
+test dependencies. Set `PYTHON_BIN=python3.12` or `VENV_DIR=/path/to/venv` to change
+them. On Linux it explicitly selects the CPU PyTorch/vision/audio wheels together.
+For CUDA, create a separate environment, install compatible wheels from the
+[PyTorch installer](https://pytorch.org/get-started/locally/), then run
+`python -m pip install -e '.[experiments,test]'`. CUDA execution is not revalidated
+by the CPU tests. Avoid mixing CPU PyTorch with a CUDA-only torchaudio wheel.
+
+For a smaller trainer-only environment, use
+`SETUP_PROFILE=smoke bash scripts/setup.sh`. Optional media/model integration tests
+will be skipped when those dependencies are absent. The
+[resolved macOS Python 3.11 environment](requirements-tested-macos-py311.txt)
+records the tested full installation; it is a platform-specific snapshot.
+
+## Datasets
+
+All seven paper datasets have a source importer and use the same prepared
+manifest interface in the actual training loaders. Follow [DATASETS.md](DATASETS.md)
+for provider access, exact extracted layouts and commands for COCO-QA, B-T4SA,
+COCO retrieval, Flickr30K, UCF101's audio subset, Kinetics-Sounds and MELD.
+
+```bash
+python scripts/prepare_data.py --dataset coco-qa --source /data/raw --root data
+python scripts/prepare_data.py --dataset coco-qa --root data --validate
+```
+
+Preparation references original files in place and records splits, labels,
+annotation hashes and media sizes. `--hash-media` adds content hashes;
+`--check-media` fully decodes audio/video. Keep the source files available.
+Restricted or large datasets must be acquired explicitly from their providers.
+No constructor downloads, renames or deletes them.
+
+## Run
+
+First exercise both fusion paths without datasets or checkpoints:
+
+```bash
 python -m mpsl.smoke --output runs/smoke
 ```
 
-The smoke run trains **two clients, two synthetic modalities and both fusion paths**, using the real classification split trainer. It records losses, accuracy, tensor payload bytes and partition indices in `runs/smoke/metrics.json`. These are execution checks, not paper results. Use a new output directory to preserve earlier runs.
+This trains two clients with two synthetic modalities through the real
+classification split trainer. Use a new output directory for another run.
 
-## Run research experiments
-
-On **Linux CPU**, install the CPU wheels first. The default Linux torchaudio
-wheel expects CUDA, even when PyTorch was installed from the CPU index:
-
-```bash
-python -m pip install --index-url https://download.pytorch.org/whl/cpu \
-  torch==2.14.1 torchvision==0.29.1 torchaudio==2.11.0
-```
-
-macOS uses the standard platform wheels. GPU users should select compatible
-PyTorch and audio wheels for their CUDA runtime; accelerator execution has not
-been revalidated for this revision.
+For research training, obtain the **Meta-Transformer base encoder** from its
+[model zoo](https://github.com/invictus717/MetaTransformer#-model-zoo) and save it as
+`checkpoints/Meta-Transformer_base_patch16_encoder.pth`. The
+[experiment guide](docs/experiments.md) lists tokenizer checkpoints, cache paths,
+audio options and baseline commands. Then run on prepared data:
 
 ```bash
-python -m pip install -e '.[experiments,test]'
-python -m mpsl.main_mpsl --help
-python -m mpsl.main_centralized --help
-python -m mpsl.main_fl --help
-```
-
-Acquire the pretrained **Meta-Transformer** weights and datasets described in the [experiment guide](docs/experiments.md). Full multimodal training is substantially more expensive than the smoke check; the original experiments used an NVIDIA H100.
-
-```bash
+mkdir -p cache/preprocessors cache/tokenizers checkpoints
 python -m mpsl.main_mpsl \
   --dataset coco-qa --dataset_split_type noniid --dirichlet_alpha 0.1 \
   --nr_of_clients 25 --batch_size 125 --nr_of_epochs 15 \
@@ -55,23 +99,46 @@ python -m mpsl.main_mpsl \
   --tokenizer_weights_cache_dir cache/tokenizers --model_weights_dir checkpoints
 ```
 
-Create these data/cache/checkpoint directories first. Supply a unique save name. Set the server batch size to a multiple of the client count. `--dirichlet_alpha 0.1` follows the paper; `0.5` recovers the historical code's concentration. Dataset acquisition and access restrictions are documented per dataset.
+The server batch size must be divisible by the client count, with enough examples
+for each client. The paper's Dirichlet concentration is `0.1`; `0.5` selects the
+historical code setting. `python -m mpsl.main_mpsl --help`,
+`python -m mpsl.main_centralized --help` and `python -m mpsl.main_fl --help` expose
+all options. Full pretrained experiments need substantially more memory and time
+than the CPU check; the original experiments used an NVIDIA H100.
 
-## What is included
+## Outputs and reproduction limits
 
-| Component | Location |
-| --- | --- |
-| Shared transformer and modality tokenizers | `src/mpsl/models/` |
-| Split, centralized and federated trainers | `src/mpsl/trainers/` |
-| Dataset loaders and seeded client partitions | `src/mpsl/available_datasets/` |
-| Tensor communication accounting and aggregation | `src/mpsl/utils/` |
-| Offline early/late fusion execution check | `src/mpsl/smoke.py` |
-| Regression and gradient-equivalence checks | `tests/` |
+The smoke writes `runs/smoke/metrics.json`, including losses, accuracy, payload
+bytes and client indices. Research runs write `<save_file_name>.json` and
+`<save_file_name>.pth` under `--model_weights_dir`. JSON includes configuration,
+prepared-manifest hash, class map, split counts, metric history and communication
+counters. Use a unique save name to preserve earlier results.
 
-The maintained release fixes partial-batch accuracy weighting in split and baseline trainers, shared experiment-history state, storage-based communication counts, non-contiguous client aggregation/checkpoint loading, and retrieval partitions that could omit samples. Dataset/model imports are lazy, and the code installs under the `mpsl` namespace rather than generic top-level `models` or `utils` packages.
+Tests cover source-format preparation for all seven datasets, unchanged raw files,
+actual classification/retrieval split-training updates, deterministic media
+evaluation, gradient equivalence across serialized tensor boundaries, partition
+coverage and checkpoint round trips. Generated fixtures establish execution;
+full benchmark accuracy, H100 performance and pretrained dataset trajectories have
+not been rerun. Tensor byte counts exclude serialization/network framing.
+MELD preserves the recovered 766-frame audio shape despite its misleading
+historical `3.88s` option; [details and dataset conventions](DATASETS.md) stay
+explicit. See [reproducibility notes](docs/REPRODUCIBILITY.md) for provenance.
 
-## Validation boundaries
+## Citation
 
-Tests check classification and retrieval update equivalence across serialized tensor boundaries, deterministic early/late fusion training, isolated metrics, dtype-aware payload sizes, partition coverage and checkpoint round trips. Full published dataset results, accelerator performance and retrieval benchmarks have **not** been rerun for this revision. Tensor byte counts exclude serialization headers, shape/dtype metadata and network framing, and do not measure encrypted or authenticated traffic.
+```bibtex
+@misc{fudala2025finetuningmultimodaltransformersedge,
+  title={Fine-tuning Multimodal Transformers on Edge: A Parallel Split Learning Approach},
+  author={Timo Fudala and Vasileios Tsouvalas and Nirvana Meratnia},
+  year={2025},
+  eprint={2502.06355},
+  archivePrefix={arXiv},
+  primaryClass={cs.DC},
+  url={https://arxiv.org/abs/2502.06355}
+}
+```
 
-See [reproducibility notes](docs/REPRODUCIBILITY.md) for source provenance and the precise scope of validation. Dataset, model and third-party code terms continue to apply; the repository retains its MIT license.
+## License
+
+[MIT](LICENSE). Dataset, pretrained model and third-party code terms apply
+separately; those resources are not redistributed by this repository.

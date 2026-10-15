@@ -14,6 +14,8 @@ def _decode_audio(path):
             raise ValueError(f"No audio stream in {path}")
         stream = container.streams.audio[0]
         rate = stream.codec_context.sample_rate
+        if rate is None or rate <= 0:
+            raise ValueError(f"Missing or invalid audio sample rate in {path}")
         resampler = av.AudioResampler(
             format="fltp", layout=stream.codec_context.layout, rate=rate
         )

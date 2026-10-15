@@ -15,6 +15,8 @@ from mpsl.models.meta_transformer.base.meta_transformer import trainable_params_
 
 
 def validate_base_argument_constraints(argument_parser):
+    if argument_parser.audio_time_dimension is None:
+        argument_parser.audio_time_dimension = '3.88s' if argument_parser.dataset == 'meld' else '10.24s'
     if argument_parser.vit_base != 'None':
         if argument_parser.vit_base == 'ViT-H/14' and not (argument_parser.dataset == 'coco-qa' or argument_parser.dataset == 't4sa'):
             raise NotImplementedError('ViT-H/14 base is currently only supported for image, text pairs (coco-qa & t4sa datasets)')
@@ -75,7 +77,7 @@ def build_base_argument_parser():
     parser.add_argument('--gpu_id', type=str, default=None, help='If desired, this parameter can be used to explicitly define which CUDA gpu to use.')
 
     # Specifically for datasets with the audio modality
-    parser.add_argument('--audio_time_dimension', type=str, default='10.24s', help='This parameter is explicitly used for datasets with the audio modality. It defines the duration/dimension of a single audio input sample. For available options, please refer to the model implementation of the chosen task.')
+    parser.add_argument('--audio_time_dimension', type=str, default=None, help='This parameter is explicitly used for datasets with the audio modality. It defines the duration/dimension of a single audio input sample. For available options, please refer to the model implementation of the chosen task.')
 
     return parser
 

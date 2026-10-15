@@ -1,7 +1,7 @@
 # Dataset and experiment guide
 
 ## Environment
-We conduct our experiments with Python 3.11.3 using a single NVIDIA H100 GPU.
+The original experiments used Python 3.11.3 and a single NVIDIA H100 GPU. For the maintained Python 3.11/3.12 environment, follow [Setup](../README.md#setup), including the Linux CPU audio wheel selection.
 
 Create a new Python environment (using e.g. virtualenv or anaconda) and install all required packages via:
 ```console
@@ -12,31 +12,36 @@ python -m pip install -e '.[experiments]'
 Throughout our experiments, we use pre-trained weights from [Meta-Transformer](https://github.com/invictus717/MetaTransformer) based on ViT-B/16 (Meta-Transformer's base scale). In order to execute our experiments, ensure the model weights have been downloaded.
 
 ## Datasets
-The following datasets are used in our experiments:
 
-- [COCO-QA](https://www.cs.toronto.edu/~mren/research/imageqa/data/cocoqa/)
-- [Flickr30K](https://huggingface.co/datasets/nlphuji/flickr30k)
-- [Kinetics-Sounds](https://github.com/weiguoPian/AV-CIL_ICCV2023)
-- [MELD](https://affective-meld.github.io/)
-- [MS-COCO](https://cocodataset.org/)
-- [T4SA](http://www.t4sa.it/)
-- [UCF101](https://www.crcv.ucf.edu/data/UCF101.php)
+Use the source importers documented in [DATASETS.md](../DATASETS.md). All seven
+paper datasets require explicit acquisition, preparation and validation before
+training. Set `--torch_data_dir` to the prepared root containing the dataset
+manifest directories. Constructors no longer download, rename, move or delete
+source files. The guide specifies provider access, exact source layouts,
+recovered versus maintained split conventions, and deterministic evaluation.
 
-All datasets, except for T4SA and Kinetics-Sounds, are downloaded automatically when the experiments are initialized. For instructions on how to include these two datasets, please refer to the sections on [T4SA](#t4sa) and [Kinetics-Sounds](#kinetics-sounds) below.
+## Checkpoints and caches
 
-### T4SA
-Access to the T4SA dataset requires authentication. Please visit [the official website](http://www.t4sa.it/) to request access and download the dataset. We use the **B-T4SA** version in our experiments.
+Obtain `Meta-Transformer_base_patch16_encoder.pth` from the upstream
+[Meta-Transformer model zoo](https://github.com/invictus717/MetaTransformer#-model-zoo)
+and place it directly in `--model_weights_dir`. The optional large encoder uses
+`Meta-Transformer_large_patch14_encoder.pth` in that directory. These are encoder
+state dictionaries, not full training checkpoints. Record the checkpoint SHA256
+with your run; it is not bundled or downloaded by the setup script.
 
-Once downloaded, place the dataset in a sub-folder named `b-t4sa`, in the datasets parent folder.
+The default image processor loads `facebook/vit-mae-base`; the image tokenizer
+loads OpenCLIP `ViT-B/16` with `laion2b_s34b_b88k` weights. Default text embeddings
+load the named OpenAI CLIP encoder through OpenCLIP. Audio tokenizers load
+`MIT/ast-finetuned-audioset-10-10-0.4593`. These initial model loads require network
+access or a populated Hugging Face/OpenCLIP cache, separate from dataset access.
+`--pre_processors_cache_dir` and `--tokenizer_weights_cache_dir` control the
+explicit processor/image-tokenizer caches; `HF_HOME` controls other Hugging Face
+caches. `--use_clip_encoder_for_text_embeddings False` selects token IDs instead
+of pretrained text features and changes the experiment.
 
-### Kinetics-Sounds
-For including the Kinetics-Sounds dataset, we follow the instructions in [this](https://github.com/weiguoPian/AV-CIL_ICCV2023) repository. Since Kinetics-Sounds is a subset of Kinetics-400, the original data has to be downloaded using the [official](https://github.com/cvdfoundation/kinetics-dataset) repository.
-To ensure the data is in the expected format for our codebase, please refer to the steps below.
-
-1. Download and extract the Kinetics-400 dataset into your `datasets` folder following the instructions in the [official](https://github.com/cvdfoundation/kinetics-dataset) repository.
-2. Execute `python arrange_by_classes.py k400` to restructure the raw Kinetics-400 data. The python file is included in the official repository.
-3. Optional: If you wish to minimize used space, delete the `k400_targz` folder by executing `rm -r k400_targz`.
-4. Optional: The Kinetics-Sounds data that we use for our experiments is roughly 24 GB worth of videos, whereas Kinetics-400 in its entirety is roughly 441 GB. Upon initialization, the codebase will copy the relevant video files into a `kinetics-sounds` folder in your `dataset` folder. Once finished, the `kinetics-dataset` folder that contains all Kinetics-400 data can be deleted.
+For action recognition use `--audio_time_dimension 1s` or `10.24s`. MELD selects
+the historical `3.88s` key by default; its actual recovered frontend produces
+766 filterbank frames as explained in [DATASETS.md](../DATASETS.md#meld-meld).
 
 ## Executing experiments
 To run any of the experiments, execute one of the following installed module entry points:
@@ -58,7 +63,7 @@ Please refer to the examples below on how to execute experiments with the COCO-Q
 ```console
 python -u -m mpsl.main_mpsl --model meta_transformer \
                                   --dataset coco-qa \
-                                  --dataset_split_type noniid \
+                                  --dataset_split_type noniid --dirichlet_alpha 0.1 \
                                   --nr_of_clients 100 \
                                   --batch_size 500 \
                                   --nr_of_epochs 15 \
@@ -93,7 +98,7 @@ python -u -m mpsl.main_centralized --model meta_transformer \
 ```console
 python -u -m mpsl.main_fl --model meta_transformer \
                                 --dataset coco-qa \
-                                --dataset_split_type noniid \
+                                --dataset_split_type noniid --dirichlet_alpha 0.1 \
                                 --nr_of_clients 100 \
                                 --batch_size 500 \
                                 --nr_of_epochs 15 \
@@ -114,7 +119,7 @@ python -u -m mpsl.main_fl --use_adapter_approach True \
                                 --include_text_adapter True \
                                 --model meta_transformer \
                                 --dataset coco-qa \
-                                --dataset_split_type noniid \
+                                --dataset_split_type noniid --dirichlet_alpha 0.1 \
                                 --nr_of_clients 100 \
                                 --batch_size 500 \
                                 --nr_of_epochs 15 \

@@ -147,7 +147,7 @@ if __name__ == '__main__':
     server_optimizer, server_scheduler = get_optimizer_and_scheduler(server_model, global_args)
 
     # A utility object that can be used to streamline archiving experiment results.
-    experiment_results = ExperimentResults()
+    experiment_results = ExperimentResults(global_args)
 
     # # # # # # # # # # # # # # # # # Training # # # # # # # # # # # # # # # # #
     for epoch_nr in range(global_args.nr_of_epochs):

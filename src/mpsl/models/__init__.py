@@ -1,3 +1,16 @@
+import os
+
+
+def _prepared_class_count(dataset):
+    from mpsl.available_datasets.preparation import load_manifest
+    return len(load_manifest(os.environ['TORCH_DATA_DIR'], dataset)['class_to_idx'])
+
+
+def _prepared_test_size(dataset):
+    from mpsl.available_datasets.preparation import load_manifest
+    return load_manifest(os.environ['TORCH_DATA_DIR'], dataset)['counts']['test']
+
+
 from importlib import import_module
 
 
@@ -78,7 +91,7 @@ def get_federated_model_and_trainer(global_args: Namespace, device: torch.device
             trainable_params_key=global_args.trainable_params_key,
             use_clip_encoder_for_text_embeddings=global_args.use_clip_encoder_for_text_embeddings,
             device=device,
-            num_classes=NR_OF_CLASSES,
+            num_classes=_prepared_class_count(dataset),
             fusion_type=global_args.fusion_type,
             use_adapter_approach=global_args.use_adapter_approach,
             include_image_adapter=global_args.include_image_adapter,
@@ -97,7 +110,7 @@ def get_federated_model_and_trainer(global_args: Namespace, device: torch.device
             trainable_params_key=global_args.trainable_params_key,
             use_clip_encoder_for_text_embeddings=global_args.use_clip_encoder_for_text_embeddings,
             device=device,
-            num_classes=NR_OF_CLASSES,
+            num_classes=_prepared_class_count(dataset),
             fusion_type=global_args.fusion_type,
             use_adapter_approach=global_args.use_adapter_approach,
             include_image_adapter=global_args.include_image_adapter,
@@ -121,7 +134,7 @@ def get_federated_model_and_trainer(global_args: Namespace, device: torch.device
             include_image_adapter=global_args.include_image_adapter,
             include_text_adapter=global_args.include_text_adapter,
             include_unified_adapter=global_args.include_unified_adapter
-        ), image_text_retrieval_fl_trainer(NR_OF_CAPTIONS_PER_IMAGE, TEST_SET_LEN, global_args.batch_size, move_dist_matrix_to_cpu=global_args.move_dist_matrix_to_cpu)
+        ), image_text_retrieval_fl_trainer(NR_OF_CAPTIONS_PER_IMAGE, _prepared_test_size(dataset), global_args.batch_size, move_dist_matrix_to_cpu=global_args.move_dist_matrix_to_cpu)
     elif dataset == 'coco-retrieval':
         from mpsl.available_datasets.multimodal.image_text_retrieval.coco_retrieval import NR_OF_CAPTIONS_PER_IMAGE, TEST_SET_LEN
 
@@ -138,7 +151,7 @@ def get_federated_model_and_trainer(global_args: Namespace, device: torch.device
             include_image_adapter=global_args.include_image_adapter,
             include_text_adapter=global_args.include_text_adapter,
             include_unified_adapter=global_args.include_unified_adapter
-        ), image_text_retrieval_fl_trainer(NR_OF_CAPTIONS_PER_IMAGE, TEST_SET_LEN, global_args.batch_size, move_dist_matrix_to_cpu=global_args.move_dist_matrix_to_cpu)
+        ), image_text_retrieval_fl_trainer(NR_OF_CAPTIONS_PER_IMAGE, _prepared_test_size(dataset), global_args.batch_size, move_dist_matrix_to_cpu=global_args.move_dist_matrix_to_cpu)
     elif dataset == 'ucf101':
         from mpsl.available_datasets.multimodal.action_recognition.ucf_101 import NR_OF_CLASSES
 
@@ -152,7 +165,7 @@ def get_federated_model_and_trainer(global_args: Namespace, device: torch.device
             device=device,
             fusion_type=global_args.fusion_type,
             audio_time_dimension=global_args.audio_time_dimension,
-            num_classes=NR_OF_CLASSES,
+            num_classes=_prepared_class_count(dataset),
             use_adapter_approach=global_args.use_adapter_approach,
             include_image_adapter=global_args.include_image_adapter,
             include_audio_adapter=global_args.include_audio_adapter,
@@ -171,7 +184,7 @@ def get_federated_model_and_trainer(global_args: Namespace, device: torch.device
             device=device,
             fusion_type=global_args.fusion_type,
             audio_time_dimension=global_args.audio_time_dimension,
-            num_classes=NR_OF_CLASSES,
+            num_classes=_prepared_class_count(dataset),
             use_adapter_approach=global_args.use_adapter_approach,
             include_image_adapter=global_args.include_image_adapter,
             include_audio_adapter=global_args.include_audio_adapter,
@@ -192,7 +205,7 @@ def get_federated_model_and_trainer(global_args: Namespace, device: torch.device
             device=device,
             fusion_type=global_args.fusion_type,
             audio_time_dimension=global_args.audio_time_dimension,
-            num_classes=NR_OF_CLASSES
+            num_classes=_prepared_class_count(dataset)
         ), classification_fl_trainer()
     else:
         raise NotImplementedError('Chosen model\'s dataset implementation is currently not supported.')
@@ -227,7 +240,7 @@ def get_split_model_pair_and_trainer(global_args: Namespace, device: torch.devic
             trainable_params_key=global_args.trainable_params_key,
             use_clip_encoder_for_text_embeddings=global_args.use_clip_encoder_for_text_embeddings,
             device=device,
-            num_classes=NR_OF_CLASSES,
+            num_classes=_prepared_class_count(dataset),
             fusion_type=global_args.fusion_type
         )
 
@@ -245,7 +258,7 @@ def get_split_model_pair_and_trainer(global_args: Namespace, device: torch.devic
             trainable_params_key=global_args.trainable_params_key,
             use_clip_encoder_for_text_embeddings=global_args.use_clip_encoder_for_text_embeddings,
             device=device,
-            num_classes=NR_OF_CLASSES,
+            num_classes=_prepared_class_count(dataset),
             fusion_type=global_args.fusion_type
         )
 
@@ -264,7 +277,7 @@ def get_split_model_pair_and_trainer(global_args: Namespace, device: torch.devic
             trainable_params_key=global_args.trainable_params_key,
             use_clip_encoder_for_text_embeddings=global_args.use_clip_encoder_for_text_embeddings,
             device=device
-        ), image_text_retrieval_mpsl_trainer(NR_OF_CAPTIONS_PER_IMAGE, TEST_SET_LEN, global_args.batch_size)
+        ), image_text_retrieval_mpsl_trainer(NR_OF_CAPTIONS_PER_IMAGE, _prepared_test_size(dataset), global_args.batch_size)
     elif dataset == 'coco-retrieval':
         from mpsl.available_datasets.multimodal.image_text_retrieval.coco_retrieval import NR_OF_CAPTIONS_PER_IMAGE, TEST_SET_LEN
 
@@ -277,7 +290,7 @@ def get_split_model_pair_and_trainer(global_args: Namespace, device: torch.devic
             trainable_params_key=global_args.trainable_params_key,
             use_clip_encoder_for_text_embeddings=global_args.use_clip_encoder_for_text_embeddings,
             device=device
-        ), image_text_retrieval_mpsl_trainer(NR_OF_CAPTIONS_PER_IMAGE, TEST_SET_LEN, global_args.batch_size)
+        ), image_text_retrieval_mpsl_trainer(NR_OF_CAPTIONS_PER_IMAGE, _prepared_test_size(dataset), global_args.batch_size)
 
     elif dataset == 'ucf101':
         from mpsl.available_datasets.multimodal.action_recognition.ucf_101 import NR_OF_CLASSES
@@ -292,7 +305,7 @@ def get_split_model_pair_and_trainer(global_args: Namespace, device: torch.devic
             device=device,
             fusion_type=global_args.fusion_type,
             audio_time_dimension=global_args.audio_time_dimension,
-            num_classes=NR_OF_CLASSES
+            num_classes=_prepared_class_count(dataset)
         )
         # Note usage of client_model.fusion_type instead of args.fusion_type; The latter might still be 'default' that has yet to be parsed, whereas the former will always be parsed.
         return (client_model, server_model, client_model_requires_any_grad), classification_mpsl_trainer(client_model.fusion_type, [InputModality.IMAGE, InputModality.AUDIO])
@@ -309,7 +322,7 @@ def get_split_model_pair_and_trainer(global_args: Namespace, device: torch.devic
             device=device,
             fusion_type=global_args.fusion_type,
             audio_time_dimension=global_args.audio_time_dimension,
-            num_classes=NR_OF_CLASSES
+            num_classes=_prepared_class_count(dataset)
         )
         # Note usage of client_model.fusion_type instead of args.fusion_type; The latter might still be 'default' that has yet to be parsed, whereas the former will always be parsed.
         return (client_model, server_model, client_model_requires_any_grad), classification_mpsl_trainer(client_model.fusion_type, [InputModality.IMAGE, InputModality.AUDIO])
@@ -327,7 +340,7 @@ def get_split_model_pair_and_trainer(global_args: Namespace, device: torch.devic
             device=device,
             fusion_type=global_args.fusion_type,
             audio_time_dimension=global_args.audio_time_dimension,
-            num_classes=NR_OF_CLASSES
+            num_classes=_prepared_class_count(dataset)
         )
 
         # Note usage of client_model.fusion_type instead of args.fusion_type; The latter might still be 'default' that has yet to be parsed, whereas the former will always be parsed.
@@ -365,7 +378,7 @@ def get_centralized_model_and_trainer(global_args: Namespace, device: torch.devi
             trainable_params_key=global_args.trainable_params_key,
             use_clip_encoder_for_text_embeddings=global_args.use_clip_encoder_for_text_embeddings,
             device=device,
-            num_classes=NR_OF_CLASSES,
+            num_classes=_prepared_class_count(dataset),
             fusion_type=global_args.fusion_type,
             use_adapter_approach=global_args.use_adapter_approach,
             include_image_adapter=global_args.include_image_adapter,
@@ -384,7 +397,7 @@ def get_centralized_model_and_trainer(global_args: Namespace, device: torch.devi
             trainable_params_key=global_args.trainable_params_key,
             use_clip_encoder_for_text_embeddings=global_args.use_clip_encoder_for_text_embeddings,
             device=device,
-            num_classes=NR_OF_CLASSES,
+            num_classes=_prepared_class_count(dataset),
             fusion_type=global_args.fusion_type,
             use_adapter_approach=global_args.use_adapter_approach,
             include_image_adapter=global_args.include_image_adapter,
@@ -408,7 +421,7 @@ def get_centralized_model_and_trainer(global_args: Namespace, device: torch.devi
             include_image_adapter=global_args.include_image_adapter,
             include_text_adapter=global_args.include_text_adapter,
             include_unified_adapter=global_args.include_unified_adapter
-        ), image_text_retrieval_centralized_trainer(NR_OF_CAPTIONS_PER_IMAGE, TEST_SET_LEN, global_args.batch_size)
+        ), image_text_retrieval_centralized_trainer(NR_OF_CAPTIONS_PER_IMAGE, _prepared_test_size(dataset), global_args.batch_size)
     elif dataset == 'coco-retrieval':
         from mpsl.available_datasets.multimodal.image_text_retrieval.coco_retrieval import NR_OF_CAPTIONS_PER_IMAGE, TEST_SET_LEN
 
@@ -425,7 +438,7 @@ def get_centralized_model_and_trainer(global_args: Namespace, device: torch.devi
             include_image_adapter=global_args.include_image_adapter,
             include_text_adapter=global_args.include_text_adapter,
             include_unified_adapter=global_args.include_unified_adapter
-        ), image_text_retrieval_centralized_trainer(NR_OF_CAPTIONS_PER_IMAGE, TEST_SET_LEN, global_args.batch_size)
+        ), image_text_retrieval_centralized_trainer(NR_OF_CAPTIONS_PER_IMAGE, _prepared_test_size(dataset), global_args.batch_size)
     elif dataset == 'ucf101':
         from mpsl.available_datasets.multimodal.action_recognition.ucf_101 import NR_OF_CLASSES
 
@@ -439,7 +452,7 @@ def get_centralized_model_and_trainer(global_args: Namespace, device: torch.devi
             device=device,
             fusion_type=global_args.fusion_type,
             audio_time_dimension=global_args.audio_time_dimension,
-            num_classes=NR_OF_CLASSES,
+            num_classes=_prepared_class_count(dataset),
             use_adapter_approach=global_args.use_adapter_approach,
             include_image_adapter=global_args.include_image_adapter,
             include_audio_adapter=global_args.include_audio_adapter,
@@ -458,7 +471,7 @@ def get_centralized_model_and_trainer(global_args: Namespace, device: torch.devi
             device=device,
             fusion_type=global_args.fusion_type,
             audio_time_dimension=global_args.audio_time_dimension,
-            num_classes=NR_OF_CLASSES,
+            num_classes=_prepared_class_count(dataset),
             use_adapter_approach=global_args.use_adapter_approach,
             include_image_adapter=global_args.include_image_adapter,
             include_audio_adapter=global_args.include_audio_adapter,
@@ -479,7 +492,7 @@ def get_centralized_model_and_trainer(global_args: Namespace, device: torch.devi
             device=device,
             fusion_type=global_args.fusion_type,
             audio_time_dimension=global_args.audio_time_dimension,
-            num_classes=NR_OF_CLASSES,
+            num_classes=_prepared_class_count(dataset),
             include_text_adapter=global_args.include_text_adapter,
             include_audio_adapter=global_args.include_audio_adapter,
             include_unified_adapter=global_args.include_unified_adapter
