@@ -63,8 +63,6 @@ For datasets requiring access, download the following files before running the s
 | [Flickr30K](https://shannon.cs.illinois.edu/DenotationGraph/) | Images at `flickr30k-images/<image>.jpg`, or the archive as `flickr30k-images.tar.gz`. Annotations download automatically. |
 | [T4SA](http://www.t4sa.it/) | `b-t4sa_imgs.tar` and `raw_tweets_text.csv`. Alternatively, extract under `b-t4sa/` with `data/`, `b-t4sa_train.txt`, `b-t4sa_test.txt` and the CSV. |
 
-Sources stay in `raw/`, manifests in `data/`, and weights in `checkpoints/`. Rerun to resume interrupted downloads or check prepared data.
-
 > [!NOTE]
 > Kinetics-Sounds scans several hundred GB of official K400 archives, retaining only the paper's clips. Image/text and AST audio tokenizers load on first use.
 
