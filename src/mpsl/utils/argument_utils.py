@@ -1,5 +1,7 @@
 import argparse
 import os
+from pathlib import Path
+
 def strtobool(value):
     value = str(value).lower()
     if value in {"1", "true", "yes", "on"}:
@@ -28,10 +30,16 @@ def validate_base_argument_constraints(argument_parser):
 
 
 def set_env_variables(arguments):
-    os.environ['TORCH_DATA_DIR'] = arguments.torch_data_dir
-    os.environ['PRE_PROCESSORS_CACHE_DIR'] = arguments.pre_processors_cache_dir
-    os.environ['TOKENIZER_WEIGHTS_CACHE_DIR'] = arguments.tokenizer_weights_cache_dir
-    os.environ['MODEL_WEIGHTS_DIR'] = arguments.model_weights_dir
+    directories = {
+        'TORCH_DATA_DIR': arguments.torch_data_dir,
+        'PRE_PROCESSORS_CACHE_DIR': arguments.pre_processors_cache_dir,
+        'TOKENIZER_WEIGHTS_CACHE_DIR': arguments.tokenizer_weights_cache_dir,
+        'MODEL_WEIGHTS_DIR': arguments.model_weights_dir,
+    }
+    directories = {key: Path(value) for key, value in directories.items()}
+    for directory in directories.values():
+        directory.mkdir(parents=True, exist_ok=True)
+    os.environ.update({key: str(value) for key, value in directories.items()})
     os.environ['VIT_BASE'] = arguments.vit_base
 
 
@@ -42,10 +50,10 @@ def build_base_argument_parser():
     parser = argparse.ArgumentParser()
 
     # == Data directories ==
-    parser.add_argument('--torch_data_dir', type=str, default='../../shared_data/datasets', help='The directory for the data of all datasets.')
-    parser.add_argument('--pre_processors_cache_dir', type=str, default='../../shared_data/preprocessors', help='The directory for all pre-processor weights.')
-    parser.add_argument('--tokenizer_weights_cache_dir', type=str, default='../../shared_data/tokenizers', help='The directory for all tokenizer weights.')
-    parser.add_argument('--model_weights_dir', type=str, default='../../shared_data/model_checkpoints', help='The directory of all model weights. This is the directory in which the codebase expects the Meta-Transformer model weights to be present.')
+    parser.add_argument('--torch_data_dir', type=str, default='data', help='The directory for the data of all datasets (default: data).')
+    parser.add_argument('--pre_processors_cache_dir', type=str, default='cache/preprocessors', help='The directory for all pre-processor weights (default: cache/preprocessors).')
+    parser.add_argument('--tokenizer_weights_cache_dir', type=str, default='cache/tokenizers', help='The directory for all tokenizer weights (default: cache/tokenizers).')
+    parser.add_argument('--model_weights_dir', type=str, default='checkpoints', help='The directory of all model weights, including the required Meta-Transformer encoder checkpoint (default: checkpoints).')
 
     # == Dataset and model ==
     parser.add_argument('--dataset', type=str, required=True, choices=dataloaders.keys(), help='The dataset that should be used.')

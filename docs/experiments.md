@@ -1,171 +1,80 @@
-# Dataset and experiment guide
+# Experiment guide
 
-## Environment
-The original experiments used Python 3.11.3 and a single NVIDIA H100 GPU. For the Python 3.11/3.12 environment, follow [Setup](../README.md#requirements), including the Linux CPU audio wheel selection.
+## Installation
 
-Create a new Python environment (using e.g. virtualenv or anaconda) and install all required packages via:
-```console
-python -m pip install -e '.[experiments]'
+The [setup script](../scripts/setup.sh) creates `.venv` and installs the single [requirements.txt](../requirements.txt). Override `PYTHON_BIN=python3.12` or `VENV_DIR=/path/to/venv` when needed. Python 3.11 and 3.12 are supported.
+
+For a manual installation:
+
+```bash
+python3.11 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+if [ "$(uname -s)" = Linux ]; then
+  python -m pip install --index-url https://download.pytorch.org/whl/cpu \
+    torch==2.14.1 torchvision==0.29.1 torchaudio==2.11.0
+fi
+python -m pip install -r requirements.txt
+python -m pip check
 ```
 
-## Model
-Throughout our experiments, we use pre-trained weights from [Meta-Transformer](https://github.com/invictus717/MetaTransformer) based on ViT-B/16 (Meta-Transformer's base scale). In order to execute our experiments, ensure the model weights have been downloaded.
-
-## Datasets
-
-Use the source importers documented in [DATASETS.md](../DATASETS.md). All seven
-paper datasets require explicit acquisition, preparation and validation before
-training. Set `--torch_data_dir` to the prepared root containing the dataset
-manifest directories. Source files are read in place. The guide specifies provider access, exact source layouts,
-split conventions, and deterministic evaluation.
+For **CUDA on Linux**, select a compatible wheel index from the [PyTorch installer](https://pytorch.org/get-started/locally/) and pass it as `TORCH_INDEX_URL` to `scripts/setup.sh` with a fresh `VENV_DIR=.venv-cuda`. An existing CPU environment is not converted automatically. Torch, torchvision and torchaudio must use matching CPU/CUDA variants. The paper experiments used an NVIDIA H100; the offline check still requires memory for a full ViT-B/16. PyAV wheels handle media decoding.
 
 ## Checkpoints and caches
 
-Obtain `Meta-Transformer_base_patch16_encoder.pth` from the upstream
-[Meta-Transformer model zoo](https://github.com/invictus717/MetaTransformer#-model-zoo)
-and place it directly in `--model_weights_dir`. The optional large encoder uses
-`Meta-Transformer_large_patch14_encoder.pth` in that directory. These are encoder
-state dictionaries, not full training checkpoints. Record the checkpoint SHA256
-with your run; it is not bundled or downloaded by the setup script.
+Acquire the encoder from the [Meta-Transformer model zoo](https://github.com/invictus717/MetaTransformer#-model-zoo). Place `Meta-Transformer_base_patch16_encoder.pth` in `checkpoints/`; the large variant uses `Meta-Transformer_large_patch14_encoder.pth`. These are encoder state dictionaries, not saved MPSL training runs.
 
-The default image processor loads `facebook/vit-mae-base`; the image tokenizer
-loads OpenCLIP `ViT-B/16` with `laion2b_s34b_b88k` weights. Default text embeddings
-load the named OpenAI CLIP encoder through OpenCLIP. Audio tokenizers load
-`MIT/ast-finetuned-audioset-10-10-0.4593`. These initial model loads require network
-access or a populated Hugging Face/OpenCLIP cache, separate from dataset access.
-`--pre_processors_cache_dir` and `--tokenizer_weights_cache_dir` control the
-explicit processor/image-tokenizer caches; `HF_HOME` controls other Hugging Face
-caches. `--use_clip_encoder_for_text_embeddings False` selects token IDs instead
-of pretrained text features and changes the experiment.
+| Component | Pretrained source |
+| :--- | :--- |
+| Image processor | `facebook/vit-mae-base` |
+| Image tokenizer | OpenCLIP `ViT-B/16` · `laion2b_s34b_b88k` |
+| Text features | OpenAI CLIP via OpenCLIP |
+| Audio tokenizer | `MIT/ast-finetuned-audioset-10-10-0.4593` |
 
-For action recognition use `--audio_time_dimension 1s` or `10.24s`. MELD selects
-the compatibility key `3.88s` by default; its frontend produces
-766 filterbank frames as explained in [DATASETS.md](../DATASETS.md#meld-meld).
+Tokenizers load on first use or from populated caches. Set `HF_HOME` for shared Hugging Face assets. `--use_clip_encoder_for_text_embeddings False` selects token IDs instead of pretrained text features and changes the experiment.
 
-## Executing experiments
-To run any of the experiments, execute one of the following installed module entry points:
+| CLI option | Default path |
+| :--- | :--- |
+| `--torch_data_dir` | `data` |
+| `--pre_processors_cache_dir` | `cache/preprocessors` |
+| `--tokenizer_weights_cache_dir` | `cache/tokenizers` |
+| `--model_weights_dir` | `checkpoints` |
 
-- `main_mpsl.py`: Runs fine-tuning using MPSL — **our proposed framework**.
-- `main_centralized.py`: Runs centralized fine-tuning.
-- `main_fl.py`: Runs fine-tuning using Federated Learning.
-  - To reproduce the adapter-based approach from [FedCLIP](https://github.com/microsoft/PersonalizedFL), use `main_fl.py` with the `--use_adapter_approach` flag set to `True`.
+Paths are relative to the working directory and can be overridden. Retain the encoder SHA256 with each run. Acquire and prepare datasets separately using [DATASETS.md](../DATASETS.md).
 
-Each script supports a set of configurable parameters passed as command-line arguments. To view all available options for a specific script, use the `--help` flag. For example:
-```console
-python -u -m mpsl.main_mpsl --help
+## Training and baselines
+
+The [README command](../README.md#train-and-evaluate) runs COCO-QA with 100 clients, a server batch of 500 and Dirichlet concentration 0.1. The default learning rate is `1e-4`, seed is `2024`, and training lasts 15 epochs.
+
+Reuse that command's dataset, learning-rate, model and path options for comparisons:
+
+| Run | Module | Changes to the MPSL command |
+| :--- | :--- | :--- |
+| **MPSL** | `mpsl.main_mpsl` | None |
+| Centralized | `mpsl.main_centralized` | Omit `--nr_of_clients`, `--dataset_split_type`, `--dirichlet_alpha`, `--test_num_workers` |
+| FedAvg | `mpsl.main_fl` | Change module and save name; omit `--test_num_workers` |
+| FedCLIP | `mpsl.main_fl` | Omit `--test_num_workers`; add `--use_adapter_approach True --include_image_adapter True --include_text_adapter True` |
+
+Use a unique `--save_file_name` per run and the same prepared data, class map, seed and client partitions across comparisons. All modules expose `--help`.
+
+For action recognition, use `--audio_time_dimension 1s` or `10.24s`. MELD automatically selects its `3.88s` compatibility key; the actual clip and filterbank dimensions are documented in [DATASETS.md](../DATASETS.md#meld-meld).
+
+## Outputs
+
+Each epoch evaluates the prepared test split. Research runs save `<save_file_name>.json` and `.pth` to `--model_weights_dir`; JSON records metrics, configuration, data metadata and logical tensor communication. Inspect a run with:
+
+```bash
+python -m json.tool checkpoints/cocoqa-mpsl.json
 ```
 
-### Example usage
-Please refer to the examples below on how to execute experiments with the COCO-QA dataset.
+The offline check writes `metrics.json` under its `--output` directory and refuses to overwrite an existing run. See [method details](method.md) for gradient exchange and counter definitions.
 
-**Fine-tuning the model on the COCO-QA dataset using our proposed framework (MPSL):**
-```console
-python -u -m mpsl.main_mpsl --model meta_transformer \
-                                  --dataset coco-qa \
-                                  --dataset_split_type noniid --dirichlet_alpha 0.1 \
-                                  --nr_of_clients 100 \
-                                  --batch_size 500 \
-                                  --nr_of_epochs 15 \
-                                  --nr_of_last_encoder_blocks_to_finetune 6 \
-                                  --start_lr 1e-4 \
-                                  --random_seed 2024 \
-                                  --save_file_name my_trained_model \
-                                  --torch_data_dir <path_to_datasets_folder> \
-                                  --pre_processors_cache_dir <path_to_preprocessors_cache_folder> \
-                                  --tokenizer_weights_cache_dir <path_to_tokenizer_weights_folder> \
-                                  --model_weights_dir <path_to_model_weights_folder>
+## Compute profiling
+
+```bash
+python -m mpsl.calculate_computation_overhead \
+  --dataset coco-qa --save_file_name cocoqa-overhead \
+  --nr_of_last_encoder_blocks_to_finetune 6
 ```
 
-**Centralized fine-tuning:**
-```console
-# Centralized
-python -u -m mpsl.main_centralized --model meta_transformer \
-                                         --dataset coco-qa \
-                                         --batch_size 500 \
-                                         --nr_of_epochs 15 \
-                                         --nr_of_last_encoder_blocks_to_finetune 6 \
-                                         --start_lr 1e-4 \
-                                         --random_seed 2024 \
-                                         --save_file_name my_trained_model \
-                                         --torch_data_dir <path_to_datasets_folder> \
-                                         --pre_processors_cache_dir <path_to_preprocessors_cache_folder> \
-                                         --tokenizer_weights_cache_dir <path_to_tokenizer_weights_folder> \
-                                         --model_weights_dir <path_to_model_weights_folder>
-```
-
-**Federated Learning:**
-```console
-python -u -m mpsl.main_fl --model meta_transformer \
-                                --dataset coco-qa \
-                                --dataset_split_type noniid --dirichlet_alpha 0.1 \
-                                --nr_of_clients 100 \
-                                --batch_size 500 \
-                                --nr_of_epochs 15 \
-                                --nr_of_last_encoder_blocks_to_finetune 6 \
-                                --start_lr 1e-4 \
-                                --random_seed 2024 \
-                                --save_file_name my_trained_model \
-                                --torch_data_dir <path_to_datasets_folder> \
-                                --pre_processors_cache_dir <path_to_preprocessors_cache_folder> \
-                                --tokenizer_weights_cache_dir <path_to_tokenizer_weights_folder> \
-                                --model_weights_dir <path_to_model_weights_folder>
-```
-
-**Federated Learning + Adapter (FedCLIP) approach:**
-```console
-python -u -m mpsl.main_fl --use_adapter_approach True \
-                                --include_image_adapter True \
-                                --include_text_adapter True \
-                                --model meta_transformer \
-                                --dataset coco-qa \
-                                --dataset_split_type noniid --dirichlet_alpha 0.1 \
-                                --nr_of_clients 100 \
-                                --batch_size 500 \
-                                --nr_of_epochs 15 \
-                                --nr_of_last_encoder_blocks_to_finetune 6 \
-                                --start_lr 1e-4 \
-                                --random_seed 2024 \
-                                --save_file_name my_trained_model \
-                                --torch_data_dir <path_to_datasets_folder> \
-                                --pre_processors_cache_dir <path_to_preprocessors_cache_folder> \
-                                --tokenizer_weights_cache_dir <path_to_tokenizer_weights_folder> \
-                                --model_weights_dir <path_to_model_weights_folder>
-```
-
-### Calculating computation overhead
-To calculate the computation overhead, refer to `src/mpsl/calculate_computation_overhead.py`. The computation overhead is initially calculated for the centralized models. From this, we deduce the overhead for the Split Learning counterpart by reasoning about which layers are executed on the client-side and server-side.
-
-Below is an example of how to calculate the computation overhead for the model used with the COCO-QA dataset:
-
-```console
-python -u -m mpsl.calculate_computation_overhead --dataset coco-qa \
-                                                       --save_file_name cocoqa-overhead \
-                                                       --model meta_transformer \
-                                                       --use_pre_layer_norm True \
-                                                       --use_post_layer_norm False \
-                                                       --nr_of_last_encoder_blocks_to_finetune 6 \
-                                                       --torch_data_dir <path_to_datasets_folder> \
-                                                       --pre_processors_cache_dir <path_to_preprocessors_cache_folder> \
-                                                       --tokenizer_weights_cache_dir <path_to_tokenizer_weights_folder> \
-                                                       --model_weights_dir <path_to_model_weights_folder>
-```
-
-## Citations
-If you use this repository or find our work helpful, please consider citing:
-
-<pre>@misc{fudala2025finetuningmultimodaltransformersedge,
-      title={Fine-tuning Multimodal Transformers on Edge: A Parallel Split Learning Approach},
-      author={Timo Fudala and Vasileios Tsouvalas and Nirvana Meratnia},
-      year={2025},
-      eprint={2502.06355},
-      archivePrefix={arXiv},
-      primaryClass={cs.DC},
-      url={https://arxiv.org/abs/2502.06355},
-}
-</pre>
-<!-- nousphera-project-resources -->
-## Project resources
-
-[Project page](https://nousphera.github.io/MPSL/) · [Research overview](https://nousphera.github.io/projects/mpsl/) · [A0 poster](https://nousphera.github.io/MPSL/poster.pdf) · [Paper](https://arxiv.org/abs/2502.06355)
-
-The project page and poster illustrate the method and summarize the paper’s experiments.
+The profiler measures centralized model computation; client/server allocations follow the split boundary. Keep the same model, fusion and trainable-layer settings when comparing with the [published results](https://nousphera.github.io/MPSL/#findings).

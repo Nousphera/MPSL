@@ -1,5 +1,4 @@
 import copy
-import threading
 from argparse import Namespace
 
 import torch
@@ -12,15 +11,11 @@ from mpsl.utils.argument_utils import build_base_argument_parser, \
     expand_argument_parser_with_distributed_learning_parameters, validate_base_argument_constraints, set_env_variables
 from mpsl.utils.config_utils import set_random_seed
 from mpsl.utils.cuda_utils import get_free_cuda_device_name
+from mpsl.utils.data_utils import initialize_data_iterators
 from mpsl.utils.fl_utils import fed_avg, get_client_weight_multipliers__nr_of_elements
 from mpsl.utils.model_saving_utils import save_split_model, save_experiment_results
 from mpsl.utils.mpsl_utils import compute_mini_batch_size
 from mpsl.utils.scheduler_utils import get_optimizer_and_scheduler
-
-
-def init_data_iterator(client_id, client_data_iterators, client_dataloaders, barrier):
-    client_data_iterators[client_id] = iter(client_dataloaders[client_id])
-    barrier.wait()
 
 
 def handle_train_epoch(
@@ -38,16 +33,8 @@ def handle_train_epoch(
         client_schedulers,
         epoch_nr,
         global_args):
-    client_data_iterators = dict()
-
-    # Note: Data iterators are initialized in separate threads to speed up loading time on slow disks with a large number of clients.
     print('Initializing train data iterators')
-    barrier = threading.Barrier(global_args.nr_of_clients + 1)
-
-    for client_id in range(global_args.nr_of_clients):
-        threading.Thread(target=init_data_iterator, args=(client_id, client_data_iterators, client_dataloaders, barrier)).start()
-
-    barrier.wait()
+    client_data_iterators = initialize_data_iterators(client_dataloaders)
 
     return trainer.train_epoch(
         device=device,

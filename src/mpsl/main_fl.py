@@ -1,7 +1,5 @@
 import copy
-import threading
 from argparse import Namespace
-from distutils.util import strtobool
 
 import torch
 
@@ -10,9 +8,10 @@ from mpsl import models
 from mpsl.trainers.implementations.experiment_results import ExperimentResults
 from mpsl.utils.argument_utils import validate_base_argument_constraints, build_base_argument_parser, \
     expand_argument_parser_with_adapter_approach_parameters, \
-    expand_argument_parser_with_distributed_learning_parameters, set_env_variables
+    expand_argument_parser_with_distributed_learning_parameters, set_env_variables, strtobool
 from mpsl.utils.config_utils import set_random_seed
 from mpsl.utils.cuda_utils import get_free_cuda_device_name
+from mpsl.utils.data_utils import initialize_data_iterators
 from mpsl.utils.fl_utils import fed_avg, synchronize_models_in_place, get_client_weight_multipliers__nr_of_elements, \
     AGGREGATED_MODEL_NAME
 from mpsl.utils.model_saving_utils import save_federated_model, save_experiment_results
@@ -20,22 +19,9 @@ from mpsl.utils.mpsl_utils import compute_mini_batch_size
 from mpsl.utils.scheduler_utils import get_optimizer_and_scheduler
 
 
-def init_data_iterator(client_id, client_data_iterators, client_data_loaders, barrier):
-    client_data_iterators[client_id] = iter(client_data_loaders[client_id])
-    barrier.wait()
-
-
 def handle_train_epoch(trainer, experiment_results, device, client_data_loaders: dict, client_models: dict, epoch_nr, nr_of_clients, client_optimizers: dict, client_schedulers: dict):
-    client_data_iterators = dict()
-
-    # Note: Data iterators are initialized in separate threads to speed up loading time on slow disks with a large number of clients.
     print('Initializing train data iterators')
-    barrier = threading.Barrier(nr_of_clients + 1)
-
-    for client_id in range(nr_of_clients):
-        threading.Thread(target=init_data_iterator, args=(client_id, client_data_iterators, client_data_loaders, barrier)).start()
-
-    barrier.wait()
+    client_data_iterators = initialize_data_iterators(client_data_loaders)
 
     return trainer.train_epoch(
         device=device,

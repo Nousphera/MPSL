@@ -22,6 +22,3 @@ testpaths = ["tests"]
 
 [tool.setuptools.package-data]
 mpsl = ["available_datasets/**/assets/**/*.txt"]
-
-[tool.setuptools.data-files]
-"share/mpsl/tests" = ["tests/conftest.py"]

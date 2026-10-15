@@ -1,0 +1,80 @@
+{
+  "source": "https://arxiv.org/pdf/2502.06355v3",
+  "walkthrough": "https://nousphera.github.io/projects/mpsl/",
+  "scene_order": [
+    "Tokenize",
+    "Send tokens",
+    "Predict",
+    "Local loss",
+    "Backward",
+    "Update"
+  ],
+  "seconds_per_scene": 5,
+  "frames_per_second": 10,
+  "artifacts": [
+    {
+      "file": "method-dark-mobile.gif",
+      "bytes": 1026302,
+      "sha256": "cf1541b349a2511e1b68aa5de54dadc40349170f2d6b61d6a50b54d128a6e8b8",
+      "width": 840,
+      "height": 1640,
+      "r_frame_rate": "10/1",
+      "nb_frames": "300",
+      "duration_seconds": 30,
+      "loop": "infinite"
+    },
+    {
+      "file": "method-dark.gif",
+      "bytes": 573758,
+      "sha256": "7757ee93c38ddd0b5ec790f3173f80ee0af90ded2b43523d10fda1c9968dfd41",
+      "width": 960,
+      "height": 780,
+      "r_frame_rate": "10/1",
+      "nb_frames": "300",
+      "duration_seconds": 30,
+      "loop": "infinite"
+    },
+    {
+      "file": "method-dark.mp4",
+      "bytes": 324852,
+      "sha256": "e239a6861a2ac0dcdcddfe94cae35a5a6d92f752678a9de4e72bf92da303e060",
+      "width": 960,
+      "height": 780,
+      "r_frame_rate": "10/1",
+      "nb_frames": "300",
+      "duration_seconds": 30
+    },
+    {
+      "file": "method-light-mobile.gif",
+      "bytes": 1005574,
+      "sha256": "782ac1814e05fe7ed60427a2ffcf89d05dac146adf048f53855d7f5f139ef41e",
+      "width": 840,
+      "height": 1640,
+      "r_frame_rate": "10/1",
+      "nb_frames": "300",
+      "duration_seconds": 30,
+      "loop": "infinite"
+    },
+    {
+      "file": "method-light.gif",
+      "bytes": 564757,
+      "sha256": "c0edf7d254645446d04f157eab0ef2de932bb97eaac6c42ec43f87e03ed3b421",
+      "width": 960,
+      "height": 780,
+      "r_frame_rate": "10/1",
+      "nb_frames": "300",
+      "duration_seconds": 30,
+      "loop": "infinite"
+    },
+    {
+      "file": "method-light.mp4",
+      "bytes": 346788,
+      "sha256": "1358428b5fe2d467457188e4a69e70a69e38f9b07dc3a77b2b094edd88df8248",
+      "width": 960,
+      "height": 780,
+      "r_frame_rate": "10/1",
+      "nb_frames": "300",
+      "duration_seconds": 30
+    }
+  ]
+}

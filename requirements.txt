@@ -1,2 +1,2 @@
-# Full research environment. Run from the repository root.
--e .[experiments]
+# Install from the repository root: python -m pip install -r requirements.txt
+-e .[experiments,test]
