@@ -3,11 +3,11 @@
 <p align="center">Timo Fudala · <a href="https://vtsouval.github.io/"><strong>Vasileios Tsouvalas</strong></a> · Nirvana Meratnia</p>
 
 <p align="center">
-  <a href="https://arxiv.org/abs/2502.06355" title="Read the paper"><img src="docs/assets/icons/paper.svg" width="48" height="48" alt="Paper"></a>
-  <picture><img src="docs/assets/icons/separator.svg" width="20" height="48" alt=""></picture>
-  <a href="https://nousphera.github.io/MPSL/" title="Explore the project"><img src="docs/assets/icons/project.svg" width="48" height="48" alt="Project"></a>
-  <picture><img src="docs/assets/icons/separator.svg" width="20" height="48" alt=""></picture>
-  <a href="https://nousphera.github.io/assets/posters/mpsl-a0-landscape.pdf" title="View the poster"><img src="docs/assets/icons/poster.svg" width="48" height="48" alt="Poster"></a>
+  <a href="https://arxiv.org/abs/2502.06355" title="Read the paper"><img src="docs/assets/icons/resource-paper.svg" width="48" height="48" alt="Paper"></a>
+  <picture><img src="docs/assets/icons/resource-separator.svg" width="20" height="48" alt=""></picture>
+  <a href="https://nousphera.github.io/MPSL/" title="Explore the project"><img src="docs/assets/icons/resource-project.svg" width="48" height="48" alt="Project"></a>
+  <picture><img src="docs/assets/icons/resource-separator.svg" width="20" height="48" alt=""></picture>
+  <a href="https://nousphera.github.io/assets/posters/mpsl-a0-landscape.pdf" title="View the poster"><img src="docs/assets/icons/resource-poster.svg" width="48" height="48" alt="Poster"></a>
 </p>
 
 ## Abstract
