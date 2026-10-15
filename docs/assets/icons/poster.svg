@@ -1,1 +1,12 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#315f7c" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 10h8M8 17h3m3-4h2m-2 4h2"/><rect x="8" y="13" width="3" height="2" rx=".4"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48" fill="none">
+  <title>Research poster</title>
+  <defs><linearGradient id="surface" x1="4" y1="2" x2="44" y2="48" gradientUnits="userSpaceOnUse"><stop stop-color="#8561c8"/><stop offset="1" stop-color="#594591"/></linearGradient></defs>
+  <rect x="1" y="1" width="46" height="46" rx="12" fill="url(#surface)"/>
+  <rect x="1.5" y="1.5" width="45" height="45" rx="11.5" stroke="#fff" stroke-opacity=".2"/>
+  <g stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="10.5" y="13" width="27" height="21" rx="2"/>
+    <path d="M24 9.5V13M24 34v4.5M19.5 38.5h9M15 18h18M25 23h8M25 27h8M25 30.5h5"/>
+    <path d="M15 30v-5M18.5 30v-8M22 30v-4" stroke-width="2.5"/>
+    <path d="M12 14.5h24v5H12Z" fill="#fff" opacity=".1" stroke="none"/>
+  </g>
+</svg>

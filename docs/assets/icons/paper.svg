@@ -1,1 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#315f7c" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h6"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48" fill="none">
+  <title>Research paper</title>
+  <defs><linearGradient id="surface" x1="4" y1="2" x2="44" y2="48" gradientUnits="userSpaceOnUse"><stop stop-color="#366bd3"/><stop offset="1" stop-color="#274b99"/></linearGradient></defs>
+  <rect x="1" y="1" width="46" height="46" rx="12" fill="url(#surface)"/>
+  <rect x="1.5" y="1.5" width="45" height="45" rx="11.5" stroke="#fff" stroke-opacity=".2"/>
+  <g stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M16 11.5h12l6 6v17a2 2 0 0 1-2 2H16a2 2 0 0 1-2-2v-21a2 2 0 0 1 2-2Z"/>
+    <path d="M27 11.5v7h7M19 23h10M19 27.5h10M19 32h6"/>
+    <path d="M15 13h10v5.5h-10Z" fill="#fff" opacity=".1" stroke="none"/>
+  </g>
+</svg>
