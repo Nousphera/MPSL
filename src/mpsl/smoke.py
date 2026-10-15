@@ -1,7 +1,7 @@
-"""Offline execution check of the maintained split-learning trainer.
+"""Offline execution check of the split-learning trainer.
 
-Two synthetic modalities and small trainable networks exercise both fusion paths.
-This is not a Meta-Transformer benchmark or a network privacy demonstration.
+Two synthetic modalities and small trainable networks exercise both fusion paths
+without model or dataset downloads.
 """
 
 import argparse

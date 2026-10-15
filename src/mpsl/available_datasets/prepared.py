@@ -122,7 +122,7 @@ def audio_features(audio, rate, duration, *, center=None, start=None):
     end = offset + target
     if center is not None:
         # Preserve the centered interval at the source boundary instead of
-        # shifting it forward; pad the missing tail as in the recovered loader.
+        # shifting it forward; pad the missing tail.
         end = min(end, max(0, int((center + duration / 2) * 16000)))
     audio = audio[:, offset:end]
     audio = torch.nn.functional.pad(audio, (0, max(0, target - audio.shape[-1])))
@@ -186,7 +186,7 @@ class AudioTextDataset(PreparedDataset):
         if video_frame_rate <= 0 or tubelet_size <= 0 or num_patches <= 0:
             raise ValueError("Clip dimensions and frame rate must be positive")
         self.clip_duration = num_patches * tubelet_size / video_frame_rate
-        # Preserve recovered MELD frontend dimensions: 2.56-second clip padded
+        # Preserve MELD frontend dimensions: 2.56-second clip padded
         # to 122880 samples *after* resampling to 16 kHz, hence 766 mel frames.
         # The model option historically called this "3.88s"; see DATASETS.md.
         self.feature_duration = 7.68

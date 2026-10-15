@@ -56,7 +56,7 @@ python scripts/prepare_data.py --dataset coco-qa --source raw --root data
 ```
 
 Each question is paired with its original numeric image ID. The vocabulary covers
-both annotation splits, matching the recovered closed-vocabulary task; frequency
+both annotation splits, using a closed answer vocabulary; frequency
 orders answers, with alphabetical tie breaking. Classifier size comes from that
 saved vocabulary (430 for the full expected release), rather than the number of
 answers observed in one split. This explicit ordering can differ from old NumPy
@@ -73,9 +73,9 @@ python scripts/prepare_data.py --dataset coco-retrieval --source raw --root data
 ```
 
 The adapter follows each record's `filepath` and `filename`; a training record can
-refer to `val2014`. It preserves the recovered `train`/`test` selection and excludes
+refer to `val2014`. It uses the `train`/`test` selection and excludes
 `val` and `restval` (it does not silently switch to the common 113k training recipe).
-The first five captions are retained, as in the recovered COCO loader; records with
+The first five captions are retained; records with
 fewer than five fail validation. Evaluation size comes from the manifest, not a
 hard-coded 5,000 when running an explicitly prepared subset.
 
@@ -141,7 +141,7 @@ python scripts/prepare_data.py --dataset ucf101 --source raw --root data --check
 ```
 
 The shipped `src/mpsl/available_datasets/multimodal/action_recognition/assets/ucf101/samples.txt`
-selects the recovered 51 classes with audio and their train/test assignment. This
+selects 51 classes with audio and their train/test assignment. This
 is not the full 101-class task. A source with class directories directly beneath
 its root, or under `ucf101/`, is also accepted. Missing selected videos fail before
 training; constructors never redownload or delete anything.
@@ -149,7 +149,7 @@ training; constructors never redownload or delete anything.
 ## Kinetics-Sounds (`kinetics-sounds`)
 
 Follow the [Kinetics provider's acquisition and extraction instructions](https://github.com/cvdfoundation/kinetics-dataset)
-for Kinetics-400. The recovered subset follows [AV-CIL](https://github.com/weiguoPian/AV-CIL_ICCV2023).
+for Kinetics-400. The subset follows [AV-CIL](https://github.com/weiguoPian/AV-CIL_ICCV2023).
 For the provider's class-organized layout, prepare from the directory containing
 `k400/` (or from its parent containing `kinetics-dataset/`):
 
@@ -188,7 +188,7 @@ python scripts/prepare_data.py --dataset meld --source raw --root data --check-m
 ```
 
 The shipped `emotion_recognition/assets/meld/samples.txt` supplies utterance text
-and split assignments, including the recovered training/dev combination. The
+and split assignments, including the training/dev combination. The
 fixed class map is neutral, surprise, fear, sadness, joy, disgust and anger. A
 source rooted at `MELD.Raw/`, or the older `emotion/train_diaN_uttN.mp4` layout, is
 also supported. No shell `find`, archive extraction, renaming or deletion runs
@@ -198,10 +198,10 @@ These IDs follow the shipped numeric class map. The historical loader sorted
 emotion names alphabetically, so an old classifier head must be remapped before
 reuse; compare its label order with `class_to_idx` in the prepared manifest.
 
-**Audio compatibility:** the recovered pipeline selects a 2.56-second clip and,
+**Audio input:** the pipeline selects a 2.56-second clip and,
 after resampling to 16 kHz, pads to 122,880 samples (7.68 seconds), producing
 `1 × 766 × 128` filterbanks. This release preserves that input shape and clip
-convention. The model option is historically named `3.88s`; it is not the actual
+convention. The compatibility option is named `3.88s`; it is not the actual
 waveform duration. MELD now selects that compatible option by default. Evaluation
 uses the first clip and deterministic padding; training samples a random clip.
 A new, genuinely 3.88-second recipe would require changing tokenizer dimensions
@@ -213,11 +213,11 @@ For UCF101, Kinetics-Sounds and MELD, `--samples-file /path/to/samples.txt` acce
 explicit subset in the same format as the shipped file. The manifest marks it as
 custom and hashes the list. Both splits must remain present; the global label map
 is retained even if a split lacks classes. This supports smaller acquired datasets
-and execution fixtures without claiming the full paper split was recovered.
+and small execution fixtures, with their membership recorded explicitly.
 For image/text datasets, supply the corresponding source-format annotation subset
 in a separate source root. Counts and annotation hashes identify it.
 
-UCF/Kinetics training uses random frames and the recovered image augmentation;
+UCF/Kinetics training uses random frames and image augmentation;
 evaluation uses the center decoded frame and resize/center-crop. Audio is mono,
 resampled to 16 kHz, aligned around that frame and padded to a fixed size. Use
 `--audio_time_dimension 1s` (98 frames) or `10.24s` (1,024 frames). Invalid/empty
@@ -229,5 +229,4 @@ process-global Python randomness. Repeating preparation and loading with the sam
 source order and seed therefore preserves the image/caption group assignments.
 
 CIFAR100 remains an additional unimodal baseline with its torchvision acquisition
-path; it is not one of the seven multimodal datasets above. All published metrics,
-full corpus availability, and accelerator performance require separate validation.
+path; it is not one of the seven multimodal datasets above.

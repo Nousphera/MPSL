@@ -1,2 +1,2 @@
-# Maintained full research environment. Run from the repository root.
+# Full research environment. Run from the repository root.
 -e .[experiments]

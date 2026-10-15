@@ -124,7 +124,7 @@ def _records(dataset, source, samples_file=None):
             split = row["split"]
             if (
                 split not in records
-            ):  # Preserve recovered train/test convention, exclude val/restval.
+            ):  # Use the train/test selection, exclude val/restval.
                 continue
             name = row["filename"]
             if dataset == "coco-retrieval":

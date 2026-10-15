@@ -2,7 +2,9 @@
 
 **Fine-Tuning Multimodal Transformers on Edge: A Parallel Split Learning Approach**
 
-[Paper](https://arxiv.org/abs/2502.06355) · [Project](https://nousphera.github.io/MPSL/) · [Datasets](DATASETS.md) · [Experiments](docs/experiments.md) · [Reproducibility](docs/REPRODUCIBILITY.md)
+Timo Fudala · Vasileios Tsouvalas · Nirvana Meratnia
+
+[<img src="docs/assets/icons/paper.svg" width="16" height="16" alt=""> Paper](https://arxiv.org/abs/2502.06355) · [<img src="docs/assets/icons/project.svg" width="16" height="16" alt=""> Project](https://nousphera.github.io/MPSL/) · [Datasets](DATASETS.md) · [Experiments](docs/experiments.md) · [Method](docs/REPRODUCIBILITY.md)
 
 ## Abstract
 
@@ -16,16 +18,25 @@ emotion recognition, action recognition, and image–text retrieval, with
 centralized and federated baselines. See the [paper](https://arxiv.org/abs/2502.06355)
 for the method and reported experiments.
 
-This maintained implementation is a single-process research simulator with
-explicit detached tensor exchanges. Correct server backpropagation requires
-prediction-gradient uploads; these are included in its communication counters
-and can reveal labels. It does not provide a privacy guarantee or reproduce the
-paper's scalar-only communication accounting. The [method correction](docs/REPRODUCIBILITY.md#explicit-gradient-exchange)
-explains the distinction.
+**Implementation:** a single-process simulator with explicit client/server
+tensor exchanges, early and late fusion, and classification and retrieval
+trainers. The [protocol guide](docs/REPRODUCIBILITY.md#explicit-gradient-exchange)
+describes gradient exchange, communication accounting and privacy properties.
 
-## Setup
+<p align="center">
+  <a href="https://nousphera.github.io/MPSL/#findings">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/results-dark.svg">
+      <img src="docs/assets/readme/results-light.svg" alt="MPSL paper results: reduced client GFLOPs and trainable parameters alongside COCO-QA, Kinetics-Sounds and MELD accuracy." width="960">
+    </picture>
+  </a>
+</p>
 
-Use **Python 3.11 or 3.12** on macOS or Linux. The maintained CPU environment uses
+*Client compute savings and task-level accuracy, shown together.* [Interactive explanation](https://nousphera.github.io/MPSL/#overview).
+
+## Requirements
+
+Use **Python 3.11 or 3.12** on macOS or Linux. The CPU environment uses
 PyTorch 2.14.1, torchvision 0.29.1, torchaudio 2.11.0, Transformers 5.19 and
 OpenCLIP 3.3. Install Python's `venv` support (`python3.11-venv` on distributions
 that package it separately). Media decoding uses PyAV wheels; no system FFmpeg
@@ -44,8 +55,7 @@ test dependencies. Set `PYTHON_BIN=python3.12` or `VENV_DIR=/path/to/venv` to ch
 them. On Linux it explicitly selects the CPU PyTorch/vision/audio wheels together.
 For CUDA, create a separate environment, install compatible wheels from the
 [PyTorch installer](https://pytorch.org/get-started/locally/), then run
-`python -m pip install -e '.[experiments,test]'`. CUDA execution is not revalidated
-by the CPU tests. Avoid mixing CPU PyTorch with a CUDA-only torchaudio wheel.
+`python -m pip install -e '.[experiments,test]'`. Select matching PyTorch, torchvision and torchaudio wheel variants.
 
 For a smaller trainer-only environment, use
 `SETUP_PROFILE=smoke bash scripts/setup.sh`. Optional media/model integration tests
@@ -71,7 +81,7 @@ annotation hashes and media sizes. `--hash-media` adds content hashes;
 Restricted or large datasets must be acquired explicitly from their providers.
 No constructor downloads, renames or deletes them.
 
-## Run
+## Training
 
 First exercise both fusion paths without datasets or checkpoints:
 
@@ -100,13 +110,35 @@ python -m mpsl.main_mpsl \
 ```
 
 The server batch size must be divisible by the client count, with enough examples
-for each client. The paper's Dirichlet concentration is `0.1`; `0.5` selects the
-historical code setting. `python -m mpsl.main_mpsl --help`,
+for each client. The paper's Dirichlet concentration is `0.1`; adjust `--dirichlet_alpha` to study other client distributions. `python -m mpsl.main_mpsl --help`,
 `python -m mpsl.main_centralized --help` and `python -m mpsl.main_fl --help` expose
 all options. Full pretrained experiments need substantially more memory and time
 than the CPU check; the original experiments used an NVIDIA H100.
 
-## Outputs and reproduction limits
+## Pretrained models
+
+MPSL uses the [Meta-Transformer base encoder](https://github.com/invictus717/MetaTransformer#-model-zoo)
+with modality-specific tokenizers: OpenCLIP for vision/text and AST for audio.
+The [checkpoint guide](docs/experiments.md#checkpoints-and-caches) lists exact
+model identifiers, local filenames and cache settings. Acquire the encoder
+before training; tokenizers load on first use or from a populated cache.
+
+## Evaluation
+
+Each training epoch evaluates the aggregated client tokenizer and shared server
+encoder on the prepared test split. Classification reports example-weighted loss
+and accuracy; retrieval reports recall in both image-to-text and text-to-image
+directions. Inspect the run in the training example with:
+
+```bash
+python -m json.tool checkpoints/cocoqa-mpsl.json
+```
+
+Use the same source manifest, label map and client partitions across comparisons.
+The [protocol guide](docs/REPRODUCIBILITY.md) defines the prediction-gradient
+exchange and exactly which tensor bytes enter communication counts.
+
+## Outputs and configuration
 
 The smoke writes `runs/smoke/metrics.json`, including losses, accuracy, payload
 bytes and client indices. Research runs write `<save_file_name>.json` and
@@ -117,12 +149,27 @@ counters. Use a unique save name to preserve earlier results.
 Tests cover source-format preparation for all seven datasets, unchanged raw files,
 actual classification/retrieval split-training updates, deterministic media
 evaluation, gradient equivalence across serialized tensor boundaries, partition
-coverage and checkpoint round trips. Generated fixtures establish execution;
-full benchmark accuracy, H100 performance and pretrained dataset trajectories have
-not been rerun. Tensor byte counts exclude serialization/network framing.
-MELD preserves the recovered 766-frame audio shape despite its misleading
-historical `3.88s` option; [details and dataset conventions](DATASETS.md) stay
-explicit. See [reproducibility notes](docs/REPRODUCIBILITY.md) for provenance.
+coverage and checkpoint round trips. Tensor byte counts include prediction-gradient uploads and exclude serialization
+and network framing. See the [protocol guide](docs/REPRODUCIBILITY.md) for the
+message sequence and [dataset guide](DATASETS.md) for label maps and audio shapes.
+
+## Results
+
+**Published classification results:** Meta-Transformer ViT-B/16, 100 clients,
+Dirichlet concentration 0.1 and three seeds. Selected tasks from
+[Table 1](https://arxiv.org/pdf/2502.06355v3#page=5); accuracy is in percent and
+GFLOPs refer to average client computation. The table preserves the paper's ± values.
+
+| Method | COCO-QA (%) | Kinetics-Sounds (%) | MELD (%) | Client GFLOPs |
+| --- | --- | --- | --- | --- |
+| Centralized | 61.7 ± 0.1 | 81.8 ± 0.2 | 61.4 ± 0.4 | 25.8 |
+| FedAvg | 53.5 ± 0.2 | 71.4 ± 0.4 | 48.9 ± 0.0 | 25.8 |
+| FedCLIP | 13.1 ± 2.6 | 63.5 ± 0.8 | 50.7 ± 0.7 | 25.8 |
+| **MPSL** | 46.2 ± 0.5 | 67.0 ± 1.1 | 58.2 ± 0.9 | 0.1 |
+
+MPSL reduces client computation and improves MELD relative to FedAvg; the
+COCO-QA and Kinetics-Sounds columns show the accompanying accuracy trade-offs.
+[Classification and retrieval results](https://nousphera.github.io/MPSL/#findings).
 
 ## Citation
 

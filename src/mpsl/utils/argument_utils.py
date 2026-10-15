@@ -94,7 +94,7 @@ def expand_argument_parser_with_adapter_approach_parameters(argument_parser):
 
 
 def expand_argument_parser_with_distributed_learning_parameters(argument_parser):
-    argument_parser.add_argument("--dirichlet_alpha", type=float, default=0.1, help="Class concentration for noniid partitions; paper setting 0.1, historical code 0.5.")
+    argument_parser.add_argument("--dirichlet_alpha", type=float, default=0.1, help="Class concentration for noniid partitions (default: 0.1).")
     argument_parser.add_argument('--nr_of_clients', type=int, required=True, help='The number of clients to use during training.')
     argument_parser.add_argument('--dataset_split_type', type=str, required=True, choices=['iid', 'noniid'], help='The type of data distribution that should be used for splitting the original dataset into all separate client-side datasets.')
 

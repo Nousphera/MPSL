@@ -1,7 +1,7 @@
 # Dataset and experiment guide
 
 ## Environment
-The original experiments used Python 3.11.3 and a single NVIDIA H100 GPU. For the maintained Python 3.11/3.12 environment, follow [Setup](../README.md#setup), including the Linux CPU audio wheel selection.
+The original experiments used Python 3.11.3 and a single NVIDIA H100 GPU. For the Python 3.11/3.12 environment, follow [Setup](../README.md#requirements), including the Linux CPU audio wheel selection.
 
 Create a new Python environment (using e.g. virtualenv or anaconda) and install all required packages via:
 ```console
@@ -16,9 +16,8 @@ Throughout our experiments, we use pre-trained weights from [Meta-Transformer](h
 Use the source importers documented in [DATASETS.md](../DATASETS.md). All seven
 paper datasets require explicit acquisition, preparation and validation before
 training. Set `--torch_data_dir` to the prepared root containing the dataset
-manifest directories. Constructors no longer download, rename, move or delete
-source files. The guide specifies provider access, exact source layouts,
-recovered versus maintained split conventions, and deterministic evaluation.
+manifest directories. Source files are read in place. The guide specifies provider access, exact source layouts,
+split conventions, and deterministic evaluation.
 
 ## Checkpoints and caches
 
@@ -40,7 +39,7 @@ caches. `--use_clip_encoder_for_text_embeddings False` selects token IDs instead
 of pretrained text features and changes the experiment.
 
 For action recognition use `--audio_time_dimension 1s` or `10.24s`. MELD selects
-the historical `3.88s` key by default; its actual recovered frontend produces
+the compatibility key `3.88s` by default; its frontend produces
 766 filterbank frames as explained in [DATASETS.md](../DATASETS.md#meld-meld).
 
 ## Executing experiments
@@ -169,4 +168,4 @@ If you use this repository or find our work helpful, please consider citing:
 
 [Project page](https://nousphera.github.io/MPSL/) · [Research overview](https://nousphera.github.io/projects/mpsl/) · [A0 poster](https://nousphera.github.io/MPSL/poster.pdf) · [Paper](https://arxiv.org/abs/2502.06355)
 
-This repository contains the research implementation. The project page and poster summarize the published method and reported experiments; this documentation update does not claim an independent reproduction of those experiments.
+The project page and poster illustrate the method and summarize the paper’s experiments.
