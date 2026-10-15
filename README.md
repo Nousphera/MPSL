@@ -27,12 +27,16 @@
 
 ## Setup
 
+Create a `.venv` and install all required packages:
+
 ```bash
 git clone https://github.com/Nousphera/MPSL.git
 cd MPSL
 bash scripts/setup.sh
 source .venv/bin/activate
 ```
+
+For an existing environment, install the requirements with:
 
 ```bash
 python -m pip install -r requirements.txt
@@ -70,38 +74,35 @@ Place the [Meta-Transformer base encoder](https://github.com/invictus717/MetaTra
 
 ## Train and evaluate
 
+From the repository root, set the shared options and run your chosen method:
+
 ```bash
-python -m mpsl.main_mpsl \
-  --dataset coco-qa --dataset_split_type noniid --dirichlet_alpha 0.1 \
-  --nr_of_clients 100 --batch_size 500 --nr_of_epochs 15 \
-  --nr_of_last_encoder_blocks_to_finetune 6 \
-  --num_workers 0 --test_num_workers 0 \
-  --save_file_name cocoqa-mpsl
+# Shared COCO-QA settings
+common=(--dataset coco-qa --batch_size 500 --nr_of_epochs 15
+        --nr_of_last_encoder_blocks_to_finetune 6 --num_workers 0)
+clients=(--nr_of_clients 100 --dataset_split_type noniid --dirichlet_alpha 0.1)
+
+# MPSL (ours)
+python -m mpsl.main_mpsl "${common[@]}" "${clients[@]}" \
+  --test_num_workers 0 --save_file_name cocoqa-mpsl
+
+# Centralized
+python -m mpsl.main_centralized "${common[@]}" \
+  --save_file_name cocoqa-centralized
+
+# FedAvg
+python -m mpsl.main_fl "${common[@]}" "${clients[@]}" \
+  --save_file_name cocoqa-fedavg
+
+# FedCLIP
+python -m mpsl.main_fl "${common[@]}" "${clients[@]}" \
+  --use_adapter_approach True \
+  --include_image_adapter True --include_text_adapter True \
+  --save_file_name cocoqa-fedclip
 ```
 
 > [!NOTE]
-> Metrics and weights are saved to `checkpoints/cocoqa-mpsl.{json,pth}`.
-
-<details>
-<summary><strong>Baselines</strong></summary>
-
-| Method | Module |
-| :--- | :--- |
-| Centralized | `mpsl.main_centralized` |
-| FedAvg | `mpsl.main_fl` |
-| FedCLIP | `mpsl.main_fl` + adapters |
-
-Omit `--test_num_workers` for all baselines. For centralized training, also omit `--nr_of_clients`, `--dataset_split_type` and `--dirichlet_alpha`.
-
-FedCLIP adds:
-
-```bash
---use_adapter_approach True \
---include_image_adapter True \
---include_text_adapter True
-```
-
-</details>
+> Metrics and weights are saved to `checkpoints/<save_file_name>.{json,pth}`.
 
 ## Citation
 
