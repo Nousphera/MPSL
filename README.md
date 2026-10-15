@@ -42,7 +42,7 @@ For an existing environment, install the requirements with:
 python -m pip install -r requirements.txt
 ```
 
-## Data and weights
+## Data and Weights
 
 Download, extract and validate a dataset, including the pretrained base encoder:
 
@@ -65,16 +65,14 @@ For datasets requiring access, download the following files before running the s
 
 Sources stay in `raw/`, manifests in `data/`, and weights in `checkpoints/`. Rerun to resume interrupted downloads or check prepared data.
 
-To set up only the [Meta-Transformer base encoder](https://github.com/invictus717/MetaTransformer#-model-zoo):
+> [!NOTE]
+> Kinetics-Sounds scans several hundred GB of official K400 archives, retaining only the paper's clips. Image/text and AST audio tokenizers load on first use.
+
+### Prepare Model
 
 ```bash
 python scripts/prepare_metatransformer.py
 ```
-
-The script creates `checkpoints/`, downloads the official weights and validates them. Dataset preparation already includes this step.
-
-> [!NOTE]
-> Kinetics-Sounds scans several hundred GB of official K400 archives, retaining only the paper's clips. Image/text and AST audio tokenizers load on first use.
 
 ## Run Experiments
 
