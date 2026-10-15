@@ -1,9 +1,9 @@
 import math
-from random import shuffle
+from random import Random, shuffle
 
 
 def image_text_retrieval__data_partitioner(
-    num_partitions, dataset_length, shuffle_indices=False, use_balancing=True
+    num_partitions, dataset_length, shuffle_indices=False, use_balancing=True, seed=None
 ):
     """Partition image/caption groups without dropping or duplicating an image.
 
@@ -16,7 +16,10 @@ def image_text_retrieval__data_partitioner(
         raise ValueError("Use a positive client count and nonnegative dataset length")
     indices = list(range(dataset_length))
     if shuffle_indices:
-        shuffle(indices)
+        if seed is None:
+            shuffle(indices)
+        else:
+            Random(seed).shuffle(indices)
     size, remainder = divmod(dataset_length, num_partitions)
     parts = {}
     offset = 0

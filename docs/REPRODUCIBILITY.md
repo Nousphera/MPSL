@@ -67,9 +67,16 @@ and retrieval evaluation sizes follow the prepared manifest, and research result
 JSON records its hash and configuration. COCO-QA's closed answer vocabulary covers
 both splits, with explicit alphabetical tie ordering. This may change label IDs
 relative to old NumPy sorting; old checkpoints require label-map verification.
+MELD now uses the shipped numeric label IDs rather than the historical loader's
+alphabetical emotion order; its old classifier heads require the same check.
 MELD's 2.56-second clip and 766-frame padded frontend are preserved explicitly,
 including the historical misnomer `3.88s`. These corrections and the source-format
 contracts are documented in [DATASETS.md](../DATASETS.md).
+
+The review also rejects physical file aliases across train/test, enforces optional
+media hashes when loaders open a split, and isolates retrieval partition sampling
+from process-global randomness using the experiment seed. Action-recognition
+audio retains the centered source interval and right padding at clip boundaries.
 
 Generated image/text/audio/video fixtures pass through every importer and its
 public dataset loader, then real classification and retrieval split trainers.

@@ -23,14 +23,17 @@ trainer, not `data/coco-qa` and not `/data/raw`. The same convention applies to
 all seven names below. Train/test must both be nonempty; preparation rejects
 missing records, duplicate media within a split (except repeated COCO-QA questions
 about an image), overlapping media/identities between splits, inconsistent labels,
-path traversal and symlinks that escape the source root. Nothing is silently skipped.
+path traversal and symlinks that escape the source root. Physical file identities
+also reject hard-linked aliases across splits. Nothing is silently skipped.
 
 Every referenced image is fully decoded. Every video is opened and its first frame
 and audio/video stream rates checked. Add `--check-media` to fully decode every
 video and audio stream; this can take substantial time. Annotation SHA256 hashes,
 media sizes, sample identities, class maps and counts are recorded. Add
 `--hash-media` during preparation to hash every media byte; validation then checks
-those hashes too. The default size checks do not detect same-size content changes.
+those hashes too. The training loaders enforce recorded media hashes once per
+unique file when loading a split, which requires rereading those media bytes.
+The default size checks do not detect same-size content changes.
 The training loaders check all files in their split and retain the manifest SHA256
 in the experiment result. Run `--validate --check-media` before expensive training.
 
@@ -191,6 +194,10 @@ source rooted at `MELD.Raw/`, or the older `emotion/train_diaN_uttN.mp4` layout,
 also supported. No shell `find`, archive extraction, renaming or deletion runs
 inside the loader.
 
+These IDs follow the shipped numeric class map. The historical loader sorted
+emotion names alphabetically, so an old classifier head must be remapped before
+reuse; compare its label order with `class_to_idx` in the prepared manifest.
+
 **Audio compatibility:** the recovered pipeline selects a 2.56-second clip and,
 after resampling to 16 kHz, pads to 122,880 samples (7.68 seconds), producing
 `1 × 766 × 128` filterbanks. This release preserves that input shape and clip
@@ -216,6 +223,10 @@ resampled to 16 kHz, aligned around that frame and padded to a fixed size. Use
 `--audio_time_dimension 1s` (98 frames) or `10.24s` (1,024 frames). Invalid/empty
 streams fail explicitly. These deterministic evaluation fixes can change results
 relative to the original randomly sampled evaluation.
+
+Retrieval client partitions use the explicit experiment seed without consuming
+process-global Python randomness. Repeating preparation and loading with the same
+source order and seed therefore preserves the image/caption group assignments.
 
 CIFAR100 remains an additional unimodal baseline with its torchvision acquisition
 path; it is not one of the seven multimodal datasets above. All published metrics,

@@ -105,7 +105,7 @@ class DirichletDataPartitioner:
 			return
 
 		if self.custom_partitioner_function is not None:
-			self._partition_id_to_indices = self.custom_partitioner_function(self._num_partitions, len(self.dataset), shuffle_indices=True)
+			self._partition_id_to_indices = self.custom_partitioner_function(self._num_partitions, len(self.dataset), shuffle_indices=True, seed=self._seed)
 		else:
 			# Generate information needed for Dirichlet partitioning
 			targets = np.asarray(self.dataset.targets) #np.array([self.dataset[i][1] for i in range(len(self.dataset))])

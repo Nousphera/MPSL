@@ -272,14 +272,21 @@ def _check_records(manifest):
         raise ValueError("Class map must be contiguous from zero")
     split_paths = {}
     split_identities = {}
+    split_files = {}
+    file_identities = {}
     for split in ("train", "test"):
         records = manifest["records"][split]
         if not records:
             raise ValueError(f"Empty {split} split")
         paths = []
         identities = []
+        physical_files = []
         for row in records:
-            safe_path(source, row["path"])
+            path = safe_path(source, row["path"])
+            if row["path"] not in file_identities:
+                stat = path.stat()
+                file_identities[row["path"]] = (stat.st_dev, stat.st_ino)
+            physical_files.append(file_identities[row["path"]])
             paths.append(row["path"])
             identities.append(row["identity"])
             if manifest["dataset"] in ("coco-retrieval", "flickr30k"):
@@ -297,15 +304,17 @@ def _check_records(manifest):
                 not isinstance(row["text"], str) or not row["text"].strip()
             ):
                 raise ValueError(f'Empty text: {row["path"]}')
-        if manifest["dataset"] != "coco-qa" and len(set(paths)) != len(paths):
+        if manifest["dataset"] != "coco-qa" and len(set(physical_files)) != len(paths):
             raise ValueError(f"Duplicate media in {split}")
         split_paths[split] = set(paths)
         split_identities[split] = set(identities)
+        split_files[split] = set(physical_files)
         if manifest["counts"][split] != len(records):
             raise ValueError("Manifest counts do not match its records")
     if (
         split_paths["train"] & split_paths["test"]
         or split_identities["train"] & split_identities["test"]
+        or split_files["train"] & split_files["test"]
     ):
         raise ValueError("Train/test media overlap")
     if set(manifest["files"]) != split_paths["train"] | split_paths["test"]:

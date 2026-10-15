@@ -29,13 +29,19 @@ class PreparedDataset(Dataset):
         self.targets = [row.get("label", i) for i, row in enumerate(self.records)]
         self.transform = transform
         # Every required path is checked, not just the last entry of a subset.
+        checked = set()
         for row in self.records:
             path = safe_path(self.source, row["path"])
+            if path in checked:
+                continue
             info = self.manifest["files"][row["path"]]
             if not path.is_file() or path.stat().st_size != info["size"]:
                 raise ValueError(
                     f"Prepared source missing or changed: {path}; run scripts/prepare_data.py --validate"
                 )
+            if "sha256" in info and sha256(path) != info["sha256"]:
+                raise ValueError(f"Prepared source hash changed: {path}")
+            checked.add(path)
 
     @property
     def num_classes(self):
@@ -113,7 +119,12 @@ def audio_features(audio, rate, duration, *, center=None, start=None):
         if center is not None
         else int((start or 0) * 16000)
     )
-    audio = audio[:, offset : offset + target]
+    end = offset + target
+    if center is not None:
+        # Preserve the centered interval at the source boundary instead of
+        # shifting it forward; pad the missing tail as in the recovered loader.
+        end = min(end, max(0, int((center + duration / 2) * 16000)))
+    audio = audio[:, offset:end]
     audio = torch.nn.functional.pad(audio, (0, max(0, target - audio.shape[-1])))
     audio = audio - audio.mean()
     return torchaudio.compliance.kaldi.fbank(
